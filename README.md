@@ -1,6 +1,6 @@
 # permachine
 
-Automatically merge machine-specific configuration files with base configurations in git repositories. Like Husky for git hooks, but for config file management.
+Per-machine config management for tools that don't support it via git.
 
 [![npm version](https://img.shields.io/npm/v/git-permachine.svg)](https://www.npmjs.com/package/git-permachine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
