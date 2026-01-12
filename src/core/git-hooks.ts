@@ -65,7 +65,15 @@ async function installHooksPathMethod(warnings: string[]): Promise<InstallResult
   await fs.mkdir(hooksDir, { recursive: true });
 
   // Copy hook templates
-  const templatesDir = path.join(__dirname, '../../templates/hooks');
+  // Find package root by looking for templates dir
+  // In development: src/core/ -> ../../templates/hooks
+  // In production (bundled): dist/ -> ../templates/hooks
+  let templatesDir = path.join(__dirname, '../../templates/hooks');
+  if (!await fileExists(path.join(templatesDir, 'post-checkout'))) {
+    // Try production path (bundled in dist/)
+    templatesDir = path.join(__dirname, '../templates/hooks');
+  }
+  
   const installedHooks: string[] = [];
 
   for (const hookName of HOOK_NAMES) {
