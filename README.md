@@ -52,6 +52,7 @@ COMMANDS:
   merge               Manually trigger merge operation
   info                Show information about current setup
   uninstall           Uninstall git hooks
+  watch               Watch for file changes and auto-merge
 
 OPTIONS:
   --help, -h          Show this help message
@@ -60,12 +61,16 @@ OPTIONS:
   --legacy            Use legacy .git/hooks wrapping (for init command)
   --auto              Auto-detect best installation method (for init command)
   --no-gitignore      Don't manage .gitignore or git tracking (for init/merge commands)
+  --debounce <ms>     Debounce delay in milliseconds (for watch command, default: 300)
+  --verbose           Show detailed file change events (for watch command)
 
 EXAMPLES:
   permachine init
   permachine merge --silent
   permachine info
   permachine uninstall
+  permachine watch
+  permachine watch --debounce 500 --verbose
 ```
 
 ## Usage
@@ -127,6 +132,44 @@ permachine merge
 ```
 
 **Prompts for confirmation** if existing files will be overwritten. Useful for testing or running without git hooks.
+
+#### Watch Mode
+
+```bash
+permachine watch
+```
+
+**What it does:**
+
+- Watches all base and machine-specific files for changes
+- Automatically merges when you save any watched file
+- Debounces rapid changes to prevent redundant merges
+- Runs continuously until you stop it (Ctrl+C)
+
+**Perfect for development** - just leave it running and your configs stay up-to-date as you type.
+
+**Example output:**
+
+```
+✓ Machine detected: laptop
+✓ Watching 4 file(s) for changes...
+  - config.base.json
+  - config.laptop.json
+  - .env.base
+  - .env.laptop
+
+[12:34:56] Changed: config.laptop.json
+[12:34:56] Merged config.base.json + config.laptop.json → config.json
+✓ Ready
+
+^C
+✓ Stopped watching
+```
+
+**Options:**
+
+- `--debounce <ms>` - Adjust debounce delay (default: 300ms)
+- `--verbose` - Show detailed file change events
 
 #### Check Setup
 
@@ -441,13 +484,13 @@ MIT © [JosXa](https://github.com/JosXa)
 - [x] Git hooks (hooksPath & legacy)
 - [x] Automatic .gitignore management
 - [x] CLI interface
-- [x] Comprehensive tests (74 tests)
+- [x] Comprehensive tests (81 tests)
 - [x] npm package publication
+- [x] Watch mode for development
 - [ ] YAML support
 - [ ] TOML support
 - [ ] Custom merge strategies
 - [ ] Config file for patterns
-- [ ] Watch mode for development
 - [ ] Dry-run mode
 
 ## Credits

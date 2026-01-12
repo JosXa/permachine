@@ -6,6 +6,7 @@ import { scanForMergeOperations } from './core/file-scanner.js';
 import { performAllMerges } from './core/merger.js';
 import { installHooks, uninstallHooks } from './core/git-hooks.js';
 import { manageGitignore } from './core/gitignore-manager.js';
+import { startWatcher } from './core/watcher.js';
 import { logger } from './utils/logger.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -50,7 +51,8 @@ async function promptConfirmation(message: string): Promise<boolean> {
 
 async function main() {
   const argv = minimist(process.argv.slice(2), {
-    boolean: ['help', 'version', 'silent', 'legacy', 'auto', 'with-package-json', 'no-gitignore'],
+    boolean: ['help', 'version', 'silent', 'legacy', 'auto', 'with-package-json', 'no-gitignore', 'verbose'],
+    string: ['debounce'],
     alias: {
       h: 'help',
       v: 'version',
@@ -90,6 +92,9 @@ async function main() {
       break;
     case 'uninstall':
       await handleUninstall(argv);
+      break;
+    case 'watch':
+      await handleWatch(argv);
       break;
     default:
       if (!command) {
@@ -311,6 +316,42 @@ async function handleUninstall(argv: any) {
   }
 }
 
+async function handleWatch(argv: any) {
+  try {
+    const machineName = getMachineName();
+    
+    // Parse debounce option
+    const debounce = argv.debounce ? parseInt(argv.debounce, 10) : 300;
+    if (isNaN(debounce) || debounce < 0) {
+      logger.error('Invalid debounce value. Must be a positive number.');
+      process.exit(1);
+    }
+    
+    // Start watcher
+    const stopWatcher = await startWatcher(machineName, {
+      debounce,
+      verbose: argv.verbose || false,
+      cwd: process.cwd(),
+    });
+    
+    // Handle graceful shutdown
+    const shutdown = async () => {
+      logger.info('Shutting down...');
+      await stopWatcher();
+      process.exit(0);
+    };
+    
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+    
+    // Keep process alive
+    await new Promise(() => {});
+  } catch (error) {
+    logger.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
 function showHelp() {
   console.log(`
 permachine - Automatically merge machine-specific config files
@@ -323,6 +364,7 @@ COMMANDS:
   merge               Manually trigger merge operation
   info                Show information about current setup
   uninstall           Uninstall git hooks
+  watch               Watch for file changes and auto-merge
 
 OPTIONS:
   --help, -h          Show this help message
@@ -331,12 +373,16 @@ OPTIONS:
   --legacy            Use legacy .git/hooks wrapping (for init command)
   --auto              Auto-detect best installation method (for init command)
   --no-gitignore      Don't manage .gitignore or git tracking (for init/merge commands)
+  --debounce <ms>     Debounce delay in milliseconds (for watch command, default: 300)
+  --verbose           Show detailed file change events (for watch command)
 
 EXAMPLES:
   permachine init
   permachine merge --silent
   permachine info
   permachine uninstall
+  permachine watch
+  permachine watch --debounce 500 --verbose
 
 DOCUMENTATION:
   https://github.com/JosXa/git-permachine
