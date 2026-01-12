@@ -2,6 +2,9 @@
 
 Automatically merge machine-specific configuration files with base configurations in git repositories. Like Husky for git hooks, but for config file management.
 
+[![npm version](https://img.shields.io/npm/v/git-permachine.svg)](https://www.npmjs.com/package/git-permachine)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Problem
 
 When working across multiple machines, you often need:
@@ -14,7 +17,7 @@ When working across multiple machines, you often need:
 
 `permachine` automatically:
 1. Detects your machine name
-2. Finds machine-specific config files (e.g., `config.homezone.json`)
+2. Finds machine-specific config files (e.g., `config.laptop.json`)
 3. Merges them with base configs (e.g., `config.base.json`)
 4. Outputs the final config (e.g., `config.json`)
 5. **Manages .gitignore** - Adds output files and removes from git tracking
@@ -23,47 +26,57 @@ When working across multiple machines, you often need:
 ## Quick Start
 
 ```bash
+# Install globally
+npm install -g git-permachine
+
 # In your repository
 cd /path/to/your/repo
 
 # Initialize (one-time setup)
-npx permachine init
+permachine init
 
 # That's it! Your configs will now auto-merge on git operations
 ```
 
-## Installation
+## CLI Reference
 
-### Development (Local)
-
-```bash
-cd D:/projects/git-permachine
-bun install
-bun link
-
-# In your target repo
-cd /path/to/your/repo
-bun link git-permachine
 ```
+permachine - Automatically merge machine-specific config files
 
-### Production
+USAGE:
+  permachine <command> [options]
 
-```bash
-npm install -g git-permachine
-# or
-bun add -g git-permachine
+COMMANDS:
+  init                Initialize permachine in current repository
+  merge               Manually trigger merge operation
+  info                Show information about current setup
+  uninstall           Uninstall git hooks
+
+OPTIONS:
+  --help, -h          Show this help message
+  --version, -v       Show version number
+  --silent, -s        Suppress all output except errors (for merge command)
+  --legacy            Use legacy .git/hooks wrapping (for init command)
+  --auto              Auto-detect best installation method (for init command)
+  --no-gitignore      Don't manage .gitignore or git tracking (for init/merge commands)
+
+EXAMPLES:
+  permachine init
+  permachine merge --silent
+  permachine info
+  permachine uninstall
 ```
 
 ## Usage
 
 ### File Naming Convention
 
-Given machine name `homezone` (auto-detected):
+Given machine name `laptop` (auto-detected from hostname):
 
 | Purpose | Filename | In Git? |
 |---------|----------|---------|
 | Base config (shared) | `config.base.json` | ✅ Yes |
-| Machine-specific | `config.homezone.json` | ✅ Yes |
+| Machine-specific | `config.laptop.json` | ✅ Yes |
 | Final output (merged) | `config.json` | ❌ No (gitignored) |
 
 Same pattern works for `.env` files:
@@ -71,36 +84,27 @@ Same pattern works for `.env` files:
 | Purpose | Filename | In Git? |
 |---------|----------|---------|
 | Base config | `.env.base` | ✅ Yes |
-| Machine-specific | `.env.homezone` | ✅ Yes |
+| Machine-specific | `.env.laptop` | ✅ Yes |
 | Final output | `.env` | ❌ No (gitignored) |
 
-### Commands
+### Basic Commands
 
-#### `init` - Initialize in repository
+#### Initialize in Repository
 
 ```bash
-permachine init [options]
-
-Options:
-  --legacy            Use .git/hooks wrapping instead of core.hooksPath
-  --auto              Auto-detect best installation method
-  --no-gitignore      Don't manage .gitignore or git tracking
+permachine init
 ```
 
 **What it does:**
-1. Detects machine name (e.g., `homezone`)
-2. Installs git hooks (post-checkout, post-merge, post-commit)
-3. Scans for existing `*.{machine}.*` files
-4. Performs initial merge
-5. **Automatically manages .gitignore:**
-   - Adds output files (e.g., `config.json`, `.env`) to `.gitignore`
-   - Removes already-tracked output files from git index (`git rm --cached`)
-   - Creates `.gitignore` if it doesn't exist
-   - Appends to existing `.gitignore` without duplicates
+- Detects your machine name (e.g., `laptop`, `desktop`, `workstation`)
+- Installs git hooks for automatic merging
+- Scans for existing machine-specific files
+- Performs initial merge
+- Adds output files to `.gitignore` and removes them from git tracking
 
 **Example output:**
 ```
-✓ Machine detected: homezone
+✓ Machine detected: laptop
 ✓ Git hooks installed via core.hooksPath
 ✓ Merged 2 file(s)
 ✓ Added 2 file(s) to .gitignore
@@ -112,28 +116,15 @@ Git hooks will auto-merge on:
   - commit
 ```
 
-#### `merge` - Manually trigger merge
+#### Manual Merge
 
 ```bash
-permachine merge [options]
-
-Options:
-  --silent            Suppress all output except errors
-  --no-gitignore      Don't manage .gitignore or git tracking
+permachine merge
 ```
 
-**What it does:**
-- Scans for machine-specific files
-- Merges with base configs
-- Writes output files
-- **Automatically updates .gitignore** (unless `--no-gitignore` is used)
+Useful for testing or running without git hooks.
 
-Useful for:
-- Testing merge logic
-- Running manually without git hooks
-- CI/CD pipelines
-
-#### `info` - Show current setup
+#### Check Setup
 
 ```bash
 permachine info
@@ -141,273 +132,202 @@ permachine info
 
 **Example output:**
 ```
-Machine name: homezone
+Machine name: laptop
 Repository: /path/to/repo
 Hooks method: core.hooksPath
 Hooks path: .permachine/hooks
 Tracked patterns: 2
-  - config.base.json + config.homezone.json → config.json
-  - .env.base + .env.homezone → .env
+  - config.base.json + config.laptop.json → config.json
+  - .env.base + .env.laptop → .env
 ```
 
-#### `uninstall` - Remove git hooks
+## Cookbook / Recipes
+
+### Recipe 1: VSCode Settings Per Machine
+
+Different settings for work laptop vs home desktop:
 
 ```bash
-permachine uninstall
+# On work laptop (machine: "worklaptop")
+.vscode/
+  ├── settings.base.json         # Shared: theme, font size
+  ├── settings.worklaptop.json   # Work paths, proxy settings
+  └── settings.json              # ← Merged output (gitignored)
+
+# On home desktop (machine: "desktop")
+.vscode/
+  ├── settings.base.json         # Shared: theme, font size
+  ├── settings.desktop.json      # Home paths, no proxy
+  └── settings.json              # ← Merged output (gitignored)
 ```
 
-Removes git hooks and restores original hooks (if using legacy mode).
-
-## How It Works
-
-### 1. Machine Detection
-
-Automatically detects machine name across platforms:
-- **Windows**: `COMPUTERNAME` environment variable
-- **Linux/Mac**: `hostname()`
-- Normalized to lowercase for consistency
-
-### 2. File Discovery
-
-Scans repository for files matching `*.{machine}.*` pattern:
-- `config.homezone.json` ✅
-- `.env.homezone` ✅
-- `settings.homezone.json` ✅
-- Ignores `node_modules/`, `.git/`, `dist/`
-
-### 3. Merging Strategy
-
-#### JSON Files
-- **Deep merge**: Machine config recursively overrides base
-- **Arrays**: Replaced entirely (not merged by index)
-- **Output**: 2-space indentation, ends with newline
-
-Example:
+**setup.base.json:**
 ```json
-// config.base.json
 {
-  "server": { "host": "localhost", "port": 3000 },
-  "logging": { "level": "info" }
-}
-
-// config.homezone.json
-{
-  "server": { "port": 8080 },
-  "database": { "password": "secret" }
-}
-
-// config.json (merged output)
-{
-  "server": { "host": "localhost", "port": 8080 },
-  "logging": { "level": "info" },
-  "database": { "password": "secret" }
+  "editor.fontSize": 14,
+  "workbench.colorTheme": "Dark+"
 }
 ```
 
-#### ENV Files
-- **Simple key-value merge**: Machine values override base
-- **Preserves comments**: From base file
-- **Quoted values**: Auto-quotes values with spaces or special chars
-
-Example:
-```bash
-# .env.base
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-API_KEY=default
-
-# .env.homezone
-DATABASE_PORT=3306
-API_KEY=secret_key_123
-
-# .env (merged output)
-DATABASE_HOST=localhost
-DATABASE_PORT=3306
-API_KEY=secret_key_123
-```
-
-### 4. Gitignore Management
-
-**Automatic on `init` and `merge`:**
-- Adds output files to `.gitignore` (e.g., `config.json`, `.env`)
-- Removes already-tracked files from git with `git rm --cached`
-- Creates `.gitignore` if missing
-- Appends to existing `.gitignore` without duplicates
-- Preserves comments and formatting
-- Normalizes paths (Windows `\` → `/`)
-
-**Edge cases handled:**
-- Files with spaces in names
-- Nested directories (`config/app.json`)
-- Mixed tracking states (some tracked, some not)
-- Idempotent - safe to run multiple times
-
-**Disable with `--no-gitignore`:**
-```bash
-permachine init --no-gitignore
-permachine merge --no-gitignore
-```
-
-### 5. Git Hooks
-
-Two installation methods:
-
-#### Preferred: `core.hooksPath`
-```bash
-git config core.hooksPath .permachine/hooks
-```
-- Clean, modern approach
-- No modification of `.git/hooks`
-- Easy to uninstall
-
-#### Legacy: `.git/hooks` wrapping
-- Backs up existing hooks to `.git/hooks/*.pre-mcs`
-- Wraps existing hooks (calls them after merge)
-- Compatible with other git hook tools
-
-### 6. Automation
-
-Hooks run on:
-- **post-checkout**: After switching branches
-- **post-merge**: After `git pull` or `git merge`
-- **post-commit**: After committing
-
-Merge happens silently in background (only logs errors).
-
-## Examples
-
-### Example 1: OpenCode Configuration
-
-```bash
-cd C:\Users\josch\.config\opencode
-
-# Initialize
-permachine init
-
-# Machine detected: homezone
-
-# Reorganize existing config
-mv config.json config.homezone.json
-
-# Create base config with shared settings
-cat > config.base.json << EOF
+**settings.worklaptop.json:**
+```json
 {
-  "theme": "nightowl-transparent",
-  "autoupdate": true
+  "http.proxy": "http://proxy.company.com:8080",
+  "terminal.integrated.cwd": "C:/Projects"
 }
-EOF
-
-# Add machine-specific settings to config.homezone.json
-# ...edit file...
-
-# Merge
-permachine merge
-
-# Output: config.json (gitignored)
-# Future git operations auto-merge!
 ```
 
-### Example 2: Multi-Environment Project
+### Recipe 2: Environment Variables
+
+Different database credentials per environment:
 
 ```bash
-# Different machines, different settings
-# Machine: "workstation"
-config.workstation.json → Development settings, localhost
-.env.workstation → Local database credentials
+# .env.base (shared defaults)
+NODE_ENV=development
+LOG_LEVEL=info
+API_PORT=3000
 
-# Machine: "server"
-config.server.json → Production settings, real domains
-.env.server → Production database credentials
+# .env.laptop (local dev)
+DATABASE_URL=postgresql://localhost:5432/myapp_dev
+API_KEY=dev_key_123
 
-# Shared base
-config.base.json → Common app settings
-.env.base → Default environment variables
+# .env.prodserver (production)
+DATABASE_URL=postgresql://prod.db.com:5432/myapp
+API_KEY=prod_key_xyz
 
-# Each machine gets its own merged config automatically!
+# .env ← Merged output (gitignored)
 ```
 
-### Example 3: Multiple Config Files
+### Recipe 3: Package.json Scripts
+
+Different build scripts for different machines:
 
 ```bash
-# Project structure
+# package.base.json
+{
+  "name": "my-app",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.0"
+  }
+}
+
+# package.laptop.json (local development)
+{
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "build": "webpack --mode development"
+  }
+}
+
+# package.buildserver.json (CI/CD)
+{
+  "scripts": {
+    "build": "webpack --mode production",
+    "deploy": "aws s3 sync dist/ s3://my-bucket"
+  }
+}
+
+# package.json ← Merged output
+# Each machine gets appropriate scripts!
+```
+
+### Recipe 4: Database Configuration
+
+Multi-environment database setup:
+
+```bash
+# config/database.base.json
+{
+  "pool": {
+    "min": 2,
+    "max": 10
+  },
+  "migrations": {
+    "directory": "./migrations"
+  }
+}
+
+# config/database.laptop.json
+{
+  "connection": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "myapp_dev",
+    "user": "dev",
+    "password": "dev123"
+  }
+}
+
+# config/database.prodserver.json
+{
+  "connection": {
+    "host": "db.production.com",
+    "port": 5432,
+    "database": "myapp_production",
+    "user": "produser",
+    "password": "secure_password_from_vault"
+  },
+  "pool": {
+    "min": 10,
+    "max": 50
+  }
+}
+```
+
+### Recipe 5: Multi-File Projects
+
+Complex projects with multiple config files:
+
+```bash
 project/
 ├── config.base.json
-├── config.homezone.json
+├── config.laptop.json
 ├── settings/
 │   ├── app.base.json
-│   ├── app.homezone.json
+│   ├── app.laptop.json
 │   ├── database.base.json
-│   └── database.homezone.json
-└── .env.base
-    .env.homezone
+│   └── database.laptop.json
+├── .env.base
+└── .env.laptop
 
-# All files auto-merge on git operations:
+# After `permachine init`, all files auto-merge:
 # - config.json
 # - settings/app.json
 # - settings/database.json
 # - .env
 ```
 
+## How It Works
+
+`permachine` uses a simple three-step process:
+
+1. **Machine Detection** - Automatically detects your machine name from hostname (Windows: `COMPUTERNAME`, Linux/Mac: `hostname()`)
+
+2. **File Discovery** - Scans your repository for files matching the pattern `*.{machine}.*` (e.g., `config.laptop.json`, `.env.desktop`)
+
+3. **Smart Merging** - Merges base and machine-specific configs:
+   - **JSON**: Deep recursive merge (machine values override base)
+   - **ENV**: Key-value merge with comment preservation
+
+4. **Gitignore Management** - Automatically adds output files to `.gitignore` and removes already-tracked files from git
+
+5. **Git Hooks** - Installs hooks to auto-merge on checkout, merge, and commit operations
+
+For detailed implementation information, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Supported File Types
 
-- ✅ **JSON** (`.json`)
-- ✅ **ENV** (`.env`, `.env.*`)
-- 🔜 **YAML** (future)
-- 🔜 **TOML** (future)
-
-## Error Handling
-
-### Base missing, machine exists
-→ Uses machine file only
-
-### Machine missing, base exists
-→ Uses base file only (rare, scanner looks for machine files)
-
-### Both missing
-→ Skips silently
-
-### Parse error
-→ Logs error with file path, skips merge
-
-### Write error
-→ Logs error, doesn't crash
-
-## Development
-
-### Setup
-
-```bash
-git clone <repo>
-cd permachine
-bun install
-```
-
-### Run Tests
-
-```bash
-# All tests
-bun test
-
-# Watch mode
-bun test --watch
-
-# Specific test file
-bun test tests/unit/json-adapter.test.ts
-```
-
-### Build
-
-```bash
-bun run build
-```
-
-### Run Locally
-
-```bash
-bun run dev init
-bun run dev merge
-bun run dev info
-```
+| Type | Extensions | Merge Strategy | Status |
+|------|-----------|----------------|--------|
+| JSON | `.json` | Deep recursive merge | ✅ Supported |
+| JSONC | `.json` with comments | Deep merge + comment preservation | ✅ Supported |
+| ENV | `.env`, `.env.*` | Key-value override | ✅ Supported |
+| YAML | `.yaml`, `.yml` | Deep recursive merge | 🔜 Planned |
+| TOML | `.toml` | Deep recursive merge | 🔜 Planned |
 
 ## Troubleshooting
 
@@ -436,32 +356,61 @@ ls .permachine/hooks/
 permachine merge
 ```
 
-**Check machine name:**
+**Check machine name matches your files:**
 ```bash
 permachine info
 # Verify "Machine name" matches your file pattern
 ```
 
+### Wrong machine name detected
+
+Machine names are auto-detected from your system hostname. To verify:
+```bash
+# Windows
+echo %COMPUTERNAME%
+
+# Linux/Mac
+hostname
+```
+
+Files must match this name (case-insensitive).
+
 ### Conflicts with other git hook tools
 
-**Use legacy mode:**
+If you use Husky or other hook managers, use legacy mode:
 ```bash
 permachine uninstall
 permachine init --legacy
 ```
 
+This wraps existing hooks instead of replacing them.
+
+### Output file not being gitignored
+
+By default, `permachine init` and `permachine merge` automatically add output files to `.gitignore`. If this isn't working:
+
+1. Check if `.gitignore` exists and contains your output files
+2. Verify the file was removed from git tracking: `git ls-files config.json` (should return nothing)
+3. If you used `--no-gitignore`, re-run without that flag
+
+To manually fix:
+```bash
+echo "config.json" >> .gitignore
+git rm --cached config.json
+```
+
 ## Contributing
 
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass (`bun test`)
-5. Submit a pull request
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Development setup
+- Architecture overview
+- Testing guidelines
+- Code standards
+- How to submit PRs
 
 ## License
 
-MIT © JosXa
+MIT © [JosXa](https://github.com/JosXa)
 
 ## Roadmap
 
