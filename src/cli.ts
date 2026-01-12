@@ -104,7 +104,7 @@ async function handleInit(argv: any) {
       logger.info('Next steps:');
       logger.info('1. Create base config files (e.g., config.base.json)');
       logger.info(`2. Create machine-specific configs (e.g., config.${machineName}.json)`);
-      logger.info('3. Run: machine-config-sync merge');
+      logger.info('3. Run: permachine merge');
     }
 
     logger.info('');
@@ -202,7 +202,7 @@ async function handleUninstall(argv: any) {
 
 async function updateGitignore(operations: any[]) {
   const gitignorePath = path.join(process.cwd(), '.gitignore');
-  const marker = '# Added by machine-config-sync';
+  const marker = '# Added by permachine';
   
   let content = '';
   try {
@@ -233,13 +233,13 @@ async function updateGitignore(operations: any[]) {
 
 function showHelp() {
   console.log(`
-machine-config-sync - Automatically merge machine-specific config files
+permachine - Automatically merge machine-specific config files
 
 USAGE:
-  machine-config-sync <command> [options]
+  permachine <command> [options]
 
 COMMANDS:
-  init                Initialize machine-config-sync in current repository
+  init                Initialize permachine in current repository
   merge               Manually trigger merge operation
   info                Show information about current setup
   uninstall           Uninstall git hooks
@@ -252,13 +252,13 @@ OPTIONS:
   --auto              Auto-detect best installation method (for init command)
 
 EXAMPLES:
-  machine-config-sync init
-  machine-config-sync merge --silent
-  machine-config-sync info
-  machine-config-sync uninstall
+  permachine init
+  permachine merge --silent
+  permachine info
+  permachine uninstall
 
 DOCUMENTATION:
-  https://github.com/JosXa/machine-config-sync
+  https://github.com/JosXa/git-permachine
   `);
 }
 

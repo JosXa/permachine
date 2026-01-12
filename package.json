@@ -1,10 +1,10 @@
 {
-  "name": "machine-config-sync",
+  "name": "git-permachine",
   "version": "0.1.0",
-  "description": "Automatically merge machine-specific config files with base configs",
+  "description": "Automatically merge machine-specific config files with base configs using git hooks",
   "type": "module",
   "bin": {
-    "machine-config-sync": "./dist/cli.js"
+    "permachine": "./dist/cli.js"
   },
   "scripts": {
     "build": "bun build src/cli.ts --outdir dist --target node --format esm",

@@ -28,12 +28,12 @@ describe('git-hooks integration', () => {
 
       // Check git config
       const hooksPath = await repo.getGitConfig('core.hooksPath');
-      expect(hooksPath).toBe('.machine-config-sync/hooks');
+      expect(hooksPath).toBe('.permachine/hooks');
 
       // Check hook files exist
-      expect(await repo.fileExists('.machine-config-sync/hooks/post-checkout')).toBe(true);
-      expect(await repo.fileExists('.machine-config-sync/hooks/post-merge')).toBe(true);
-      expect(await repo.fileExists('.machine-config-sync/hooks/post-commit')).toBe(true);
+      expect(await repo.fileExists('.permachine/hooks/post-checkout')).toBe(true);
+      expect(await repo.fileExists('.permachine/hooks/post-merge')).toBe(true);
+      expect(await repo.fileExists('.permachine/hooks/post-commit')).toBe(true);
     } finally {
       process.chdir(cwd);
     }
@@ -95,7 +95,7 @@ describe('git-hooks integration', () => {
       expect(hooksPath).toBeNull();
 
       // Hooks directory should be removed
-      expect(await repo.fileExists('.machine-config-sync/hooks')).toBe(false);
+      expect(await repo.fileExists('.permachine/hooks')).toBe(false);
     } finally {
       process.chdir(cwd);
     }
