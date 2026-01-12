@@ -1,6 +1,6 @@
 # permachine
 
-Per-machine config management for tools that don't support it via git.
+Per-machine config management for tools that don't support it via git. Automatically merge machine-specific configurations with a base config.
 
 [![npm version](https://img.shields.io/npm/v/git-permachine.svg)](https://www.npmjs.com/package/git-permachine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
