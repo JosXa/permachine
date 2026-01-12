@@ -82,11 +82,11 @@ Given machine name `my-laptop` (auto-detected from hostname):
 
 Same pattern works for `.env` files:
 
-| Purpose          | Filename      | In Git?            |
-| ---------------- | ------------- | ------------------ |
-| Base config      | `.env.base`   | ✅ Yes             |
-| Machine-specific | `.env.laptop` | ✅ Yes             |
-| Final output     | `.env`        | ❌ No (gitignored) |
+| Purpose          | Filename         | In Git?            |
+| ---------------- | ---------------- | ------------------ |
+| Base config      | `.env.base`      | ✅ Yes             |
+| Machine-specific | `.env.my-laptop` | ✅ Yes             |
+| Final output     | `.env`           | ❌ No (gitignored) |
 
 ### Basic Commands
 
@@ -101,6 +101,7 @@ permachine init
 - Detects your machine name (e.g., `laptop`, `desktop`, `workstation`)
 - Installs git hooks for automatic merging
 - Scans for existing machine-specific files
+- **Prompts for confirmation** if existing files will be overwritten
 - Performs initial merge
 - Adds output files to `.gitignore` and removes them from git tracking
 
@@ -125,7 +126,7 @@ Git hooks will auto-merge on:
 permachine merge
 ```
 
-Useful for testing or running without git hooks.
+**Prompts for confirmation** if existing files will be overwritten. Useful for testing or running without git hooks.
 
 #### Check Setup
 
@@ -143,6 +144,10 @@ Hooks path: .permachine/hooks
 Tracked patterns: 2
   - config.base.json + config.laptop.json → config.json
   - .env.base + .env.laptop → .env
+
+Output files: 2 total, 1 existing
+Existing output files:
+  - config.json
 ```
 
 ## Cookbook / Recipes

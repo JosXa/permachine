@@ -10,9 +10,43 @@ import { logger } from './utils/logger.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInterface } from 'node:readline';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Check which output files already exist
+ */
+async function checkExistingOutputFiles(operations: any[]): Promise<string[]> {
+  const existing: string[] = [];
+  for (const op of operations) {
+    try {
+      await fs.access(op.outputPath);
+      existing.push(op.outputPath);
+    } catch {
+      // File doesn't exist
+    }
+  }
+  return existing;
+}
+
+/**
+ * Prompt user for confirmation
+ */
+async function promptConfirmation(message: string): Promise<boolean> {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(`${message} (y/N): `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === 'y');
+    });
+  });
+}
 
 async function main() {
   const argv = minimist(process.argv.slice(2), {
@@ -72,6 +106,34 @@ async function handleInit(argv: any) {
     const machineName = getMachineName();
     logger.success(`Machine detected: ${machineName}`);
 
+    // Scan for existing machine-specific files
+    const operations = await scanForMergeOperations(machineName);
+    
+    if (operations.length > 0) {
+      logger.info(`Found ${operations.length} machine-specific file(s)`);
+      
+      // Check which output files already exist
+      const existingFiles = await checkExistingOutputFiles(operations);
+      
+      if (existingFiles.length > 0 && !argv['no-gitignore']) {
+        // Show warning about files that will be affected
+        logger.warn('⚠️  Warning: The following files will be overwritten and untracked from git:');
+        for (const file of existingFiles) {
+          logger.warn(`  - ${path.relative(process.cwd(), file)}`);
+        }
+        logger.info('');
+        
+        // Prompt for confirmation
+        const confirmed = await promptConfirmation('Do you want to continue?');
+        
+        if (!confirmed) {
+          logger.info('Aborted.');
+          process.exit(0);
+        }
+        logger.info('');
+      }
+    }
+
     // Install git hooks
     const installResult = await installHooks({
       legacy: argv.legacy,
@@ -82,13 +144,8 @@ async function handleInit(argv: any) {
         logger.warn(warning);
       }
     }
-
-    // Scan for existing machine-specific files
-    const operations = await scanForMergeOperations(machineName);
     
     if (operations.length > 0) {
-      logger.info(`Found ${operations.length} machine-specific file(s)`);
-      
       // Perform initial merge
       const results = await performAllMerges(operations);
       const changed = results.filter(r => r.changed).length;
@@ -140,6 +197,29 @@ async function handleMerge(argv: any) {
     if (operations.length === 0) {
       // Silent exit if no operations found
       return;
+    }
+
+    // Check which output files already exist (only prompt if not silent)
+    if (!argv.silent && !argv['no-gitignore']) {
+      const existingFiles = await checkExistingOutputFiles(operations);
+      
+      if (existingFiles.length > 0) {
+        // Show warning about files that will be affected
+        logger.warn('⚠️  Warning: The following files will be overwritten and untracked from git:');
+        for (const file of existingFiles) {
+          logger.warn(`  - ${path.relative(process.cwd(), file)}`);
+        }
+        logger.info('');
+        
+        // Prompt for confirmation
+        const confirmed = await promptConfirmation('Do you want to continue?');
+        
+        if (!confirmed) {
+          logger.info('Aborted.');
+          process.exit(0);
+        }
+        logger.info('');
+      }
     }
 
     const results = await performAllMerges(operations);
@@ -202,6 +282,19 @@ async function handleInfo(argv: any) {
       const machineName = path.basename(op.machinePath);
       const outputName = path.basename(op.outputPath);
       console.log(`  - ${baseName} + ${machineName} → ${outputName}`);
+    }
+    
+    // Show which output files currently exist
+    if (operations.length > 0) {
+      const existingFiles = await checkExistingOutputFiles(operations);
+      console.log('');
+      console.log(`Output files: ${operations.length} total, ${existingFiles.length} existing`);
+      if (existingFiles.length > 0) {
+        console.log('Existing output files:');
+        for (const file of existingFiles) {
+          console.log(`  - ${path.relative(process.cwd(), file)}`);
+        }
+      }
     }
   } catch (error) {
     logger.error(error instanceof Error ? error.message : String(error));
