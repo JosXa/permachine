@@ -5,6 +5,7 @@ import { getMachineName } from './core/machine-detector.js';
 import { scanForMergeOperations } from './core/file-scanner.js';
 import { performAllMerges } from './core/merger.js';
 import { installHooks, uninstallHooks } from './core/git-hooks.js';
+import { manageGitignore } from './core/gitignore-manager.js';
 import { logger } from './utils/logger.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -15,7 +16,7 @@ const __dirname = path.dirname(__filename);
 
 async function main() {
   const argv = minimist(process.argv.slice(2), {
-    boolean: ['help', 'version', 'silent', 'legacy', 'auto', 'with-package-json'],
+    boolean: ['help', 'version', 'silent', 'legacy', 'auto', 'with-package-json', 'no-gitignore'],
     alias: {
       h: 'help',
       v: 'version',
@@ -96,8 +97,21 @@ async function handleInit(argv: any) {
         logger.success(`Merged ${changed} file(s)`);
       }
 
-      // Update .gitignore
-      await updateGitignore(operations);
+      // Manage gitignore
+      const outputPaths = operations.map(op => op.outputPath);
+      const gitignoreResult = await manageGitignore(outputPaths, { noGitignore: argv['no-gitignore'] });
+      
+      if (gitignoreResult.added.length > 0) {
+        logger.success(`Added ${gitignoreResult.added.length} file(s) to .gitignore`);
+      }
+      if (gitignoreResult.removed.length > 0) {
+        logger.success(`Removed ${gitignoreResult.removed.length} file(s) from git tracking`);
+      }
+      if (gitignoreResult.errors.length > 0) {
+        for (const error of gitignoreResult.errors) {
+          logger.warn(error);
+        }
+      }
     } else {
       logger.info('No machine-specific files found');
       logger.info('');
@@ -129,6 +143,10 @@ async function handleMerge(argv: any) {
     }
 
     const results = await performAllMerges(operations);
+    
+    // Manage gitignore
+    const outputPaths = operations.map(op => op.outputPath);
+    await manageGitignore(outputPaths, { noGitignore: argv['no-gitignore'] });
     
     // Count successful changes
     const changed = results.filter(r => r.changed).length;
@@ -200,37 +218,6 @@ async function handleUninstall(argv: any) {
   }
 }
 
-async function updateGitignore(operations: any[]) {
-  const gitignorePath = path.join(process.cwd(), '.gitignore');
-  const marker = '# Added by permachine';
-  
-  let content = '';
-  try {
-    content = await fs.readFile(gitignorePath, 'utf-8');
-  } catch {
-    // File doesn't exist, create new
-  }
-
-  // Extract output files to ignore
-  const filesToIgnore = operations.map(op => path.relative(process.cwd(), op.outputPath));
-  
-  // Check if marker already exists
-  if (content.includes(marker)) {
-    // Already set up, don't add duplicates
-    return;
-  }
-
-  // Add marker and files
-  const additions = [
-    '',
-    marker,
-    ...filesToIgnore,
-  ].join('\n');
-
-  await fs.writeFile(gitignorePath, content + additions + '\n', 'utf-8');
-  logger.success(`Updated .gitignore with ${filesToIgnore.length} file(s)`);
-}
-
 function showHelp() {
   console.log(`
 permachine - Automatically merge machine-specific config files
@@ -250,6 +237,7 @@ OPTIONS:
   --silent, -s        Suppress all output except errors (for merge command)
   --legacy            Use legacy .git/hooks wrapping (for init command)
   --auto              Auto-detect best installation method (for init command)
+  --no-gitignore      Don't manage .gitignore or git tracking (for init/merge commands)
 
 EXAMPLES:
   permachine init
