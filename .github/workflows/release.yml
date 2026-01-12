@@ -32,19 +32,11 @@ jobs:
       - name: Run tests
         run: bun test
 
-      - name: Generate changelog
-        id: changelog
-        uses: metcalfc/changelog-generator@v4.3.1
-        with:
-          myToken: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          generate_release_notes: true
           body: |
-            ## What's Changed
-            ${{ steps.changelog.outputs.changelog }}
-            
             ## Installation
             ```bash
             npm install -g git-permachine@${{ github.ref_name }}
