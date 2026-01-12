@@ -1,4 +1,5 @@
 import type { FileAdapter } from './base.js';
+import stripJsonComments from 'strip-json-comments';
 
 export class JsonAdapter implements FileAdapter {
   canHandle(extension: string): boolean {
@@ -7,7 +8,14 @@ export class JsonAdapter implements FileAdapter {
 
   parse(content: string): any {
     try {
-      return JSON.parse(content);
+      // Strip comments first
+      let stripped = stripJsonComments(content);
+      
+      // Remove trailing commas before closing brackets/braces
+      // This regex handles: ,\s*] and ,\s*}
+      stripped = stripped.replace(/,(\s*[}\]])/g, '$1');
+      
+      return JSON.parse(stripped);
     } catch (error) {
       throw new Error(`Failed to parse JSON: ${error instanceof Error ? error.message : String(error)}`);
     }
