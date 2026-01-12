@@ -16,8 +16,9 @@ When working across multiple machines, you often need:
 1. Detects your machine name
 2. Finds machine-specific config files (e.g., `config.homezone.json`)
 3. Merges them with base configs (e.g., `config.base.json`)
-4. Outputs the final config (e.g., `config.json`) - gitignored
-5. Runs automatically on git operations via hooks
+4. Outputs the final config (e.g., `config.json`)
+5. **Manages .gitignore** - Adds output files and removes from git tracking
+6. Runs automatically on git operations via hooks
 
 ## Quick Start
 
@@ -83,6 +84,7 @@ permachine init [options]
 Options:
   --legacy            Use .git/hooks wrapping instead of core.hooksPath
   --auto              Auto-detect best installation method
+  --no-gitignore      Don't manage .gitignore or git tracking
 ```
 
 **What it does:**
@@ -90,14 +92,19 @@ Options:
 2. Installs git hooks (post-checkout, post-merge, post-commit)
 3. Scans for existing `*.{machine}.*` files
 4. Performs initial merge
-5. Updates `.gitignore` with output files
+5. **Automatically manages .gitignore:**
+   - Adds output files (e.g., `config.json`, `.env`) to `.gitignore`
+   - Removes already-tracked output files from git index (`git rm --cached`)
+   - Creates `.gitignore` if it doesn't exist
+   - Appends to existing `.gitignore` without duplicates
 
 **Example output:**
 ```
 ✓ Machine detected: homezone
 ✓ Git hooks installed via core.hooksPath
-✓ Updated .gitignore with 2 file(s)
 ✓ Merged 2 file(s)
+✓ Added 2 file(s) to .gitignore
+✓ Removed 1 file(s) from git tracking
 
 Git hooks will auto-merge on:
   - checkout (switching branches)
@@ -108,8 +115,18 @@ Git hooks will auto-merge on:
 #### `merge` - Manually trigger merge
 
 ```bash
-permachine merge [--silent]
+permachine merge [options]
+
+Options:
+  --silent            Suppress all output except errors
+  --no-gitignore      Don't manage .gitignore or git tracking
 ```
+
+**What it does:**
+- Scans for machine-specific files
+- Merges with base configs
+- Writes output files
+- **Automatically updates .gitignore** (unless `--no-gitignore` is used)
 
 Useful for:
 - Testing merge logic
@@ -209,7 +226,29 @@ DATABASE_PORT=3306
 API_KEY=secret_key_123
 ```
 
-### 4. Git Hooks
+### 4. Gitignore Management
+
+**Automatic on `init` and `merge`:**
+- Adds output files to `.gitignore` (e.g., `config.json`, `.env`)
+- Removes already-tracked files from git with `git rm --cached`
+- Creates `.gitignore` if missing
+- Appends to existing `.gitignore` without duplicates
+- Preserves comments and formatting
+- Normalizes paths (Windows `\` → `/`)
+
+**Edge cases handled:**
+- Files with spaces in names
+- Nested directories (`config/app.json`)
+- Mixed tracking states (some tracked, some not)
+- Idempotent - safe to run multiple times
+
+**Disable with `--no-gitignore`:**
+```bash
+permachine init --no-gitignore
+permachine merge --no-gitignore
+```
+
+### 5. Git Hooks
 
 Two installation methods:
 
@@ -226,7 +265,7 @@ git config core.hooksPath .permachine/hooks
 - Wraps existing hooks (calls them after merge)
 - Compatible with other git hook tools
 
-### 5. Automation
+### 6. Automation
 
 Hooks run on:
 - **post-checkout**: After switching branches
@@ -427,17 +466,19 @@ MIT © JosXa
 ## Roadmap
 
 - [x] JSON support
-- [x] ENV support
+- [x] ENV support  
+- [x] JSONC support (comments & trailing commas)
 - [x] Git hooks (hooksPath & legacy)
+- [x] Automatic .gitignore management
 - [x] CLI interface
-- [x] Comprehensive tests
+- [x] Comprehensive tests (74 tests)
+- [x] npm package publication
 - [ ] YAML support
 - [ ] TOML support
 - [ ] Custom merge strategies
 - [ ] Config file for patterns
 - [ ] Watch mode for development
 - [ ] Dry-run mode
-- [ ] npm package publication
 
 ## Credits
 
