@@ -1,4 +1,4 @@
-# machine-config-sync
+# permachine
 
 Automatically merge machine-specific configuration files with base configurations in git repositories. Like Husky for git hooks, but for config file management.
 
@@ -12,7 +12,7 @@ When working across multiple machines, you often need:
 
 ## Solution
 
-`machine-config-sync` automatically:
+`permachine` automatically:
 1. Detects your machine name
 2. Finds machine-specific config files (e.g., `config.homezone.json`)
 3. Merges them with base configs (e.g., `config.base.json`)
@@ -26,7 +26,7 @@ When working across multiple machines, you often need:
 cd /path/to/your/repo
 
 # Initialize (one-time setup)
-npx machine-config-sync init
+npx permachine init
 
 # That's it! Your configs will now auto-merge on git operations
 ```
@@ -36,19 +36,21 @@ npx machine-config-sync init
 ### Development (Local)
 
 ```bash
-cd D:/projects/machine-config-sync
+cd D:/projects/git-permachine
 bun install
 bun link
 
 # In your target repo
 cd /path/to/your/repo
-bun link machine-config-sync
+bun link git-permachine
 ```
 
-### Production (Future)
+### Production
 
 ```bash
-npm install -g machine-config-sync
+npm install -g git-permachine
+# or
+bun add -g git-permachine
 ```
 
 ## Usage
@@ -76,7 +78,7 @@ Same pattern works for `.env` files:
 #### `init` - Initialize in repository
 
 ```bash
-machine-config-sync init [options]
+permachine init [options]
 
 Options:
   --legacy            Use .git/hooks wrapping instead of core.hooksPath
@@ -106,7 +108,7 @@ Git hooks will auto-merge on:
 #### `merge` - Manually trigger merge
 
 ```bash
-machine-config-sync merge [--silent]
+permachine merge [--silent]
 ```
 
 Useful for:
@@ -117,7 +119,7 @@ Useful for:
 #### `info` - Show current setup
 
 ```bash
-machine-config-sync info
+permachine info
 ```
 
 **Example output:**
@@ -125,7 +127,7 @@ machine-config-sync info
 Machine name: homezone
 Repository: /path/to/repo
 Hooks method: core.hooksPath
-Hooks path: .machine-config-sync/hooks
+Hooks path: .permachine/hooks
 Tracked patterns: 2
   - config.base.json + config.homezone.json → config.json
   - .env.base + .env.homezone → .env
@@ -134,7 +136,7 @@ Tracked patterns: 2
 #### `uninstall` - Remove git hooks
 
 ```bash
-machine-config-sync uninstall
+permachine uninstall
 ```
 
 Removes git hooks and restores original hooks (if using legacy mode).
@@ -213,7 +215,7 @@ Two installation methods:
 
 #### Preferred: `core.hooksPath`
 ```bash
-git config core.hooksPath .machine-config-sync/hooks
+git config core.hooksPath .permachine/hooks
 ```
 - Clean, modern approach
 - No modification of `.git/hooks`
@@ -241,7 +243,7 @@ Merge happens silently in background (only logs errors).
 cd C:\Users\josch\.config\opencode
 
 # Initialize
-machine-config-sync init
+permachine init
 
 # Machine detected: homezone
 
@@ -260,7 +262,7 @@ EOF
 # ...edit file...
 
 # Merge
-machine-config-sync merge
+permachine merge
 
 # Output: config.json (gitignored)
 # Future git operations auto-merge!
@@ -337,7 +339,7 @@ project/
 
 ```bash
 git clone <repo>
-cd machine-config-sync
+cd permachine
 bun install
 ```
 
@@ -374,30 +376,30 @@ bun run dev info
 
 **Check hook installation:**
 ```bash
-machine-config-sync info
+permachine info
 ```
 
 **Verify git config:**
 ```bash
 git config --get core.hooksPath
-# Should output: .machine-config-sync/hooks
+# Should output: .permachine/hooks
 ```
 
 **Check hook files exist:**
 ```bash
-ls .machine-config-sync/hooks/
+ls .permachine/hooks/
 ```
 
 ### Merge not happening
 
 **Run manually to see errors:**
 ```bash
-machine-config-sync merge
+permachine merge
 ```
 
 **Check machine name:**
 ```bash
-machine-config-sync info
+permachine info
 # Verify "Machine name" matches your file pattern
 ```
 
@@ -405,8 +407,8 @@ machine-config-sync info
 
 **Use legacy mode:**
 ```bash
-machine-config-sync uninstall
-machine-config-sync init --legacy
+permachine uninstall
+permachine init --legacy
 ```
 
 ## Contributing

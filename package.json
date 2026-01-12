@@ -18,12 +18,31 @@
     "config",
     "merge",
     "machine-specific",
+    "per-machine",
     "dotenv",
     "json",
-    "git-hooks"
+    "git-hooks",
+    "environment",
+    "configuration",
+    "multi-machine",
+    "cross-machine"
   ],
   "author": "JosXa",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JosXa/git-permachine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JosXa/git-permachine/issues"
+  },
+  "homepage": "https://github.com/JosXa/git-permachine#readme",
+  "files": [
+    "dist",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
   "devDependencies": {
     "@types/bun": "latest",
     "bun-types": "latest"
