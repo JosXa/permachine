@@ -385,7 +385,7 @@ EXAMPLES:
   permachine watch --debounce 500 --verbose
 
 DOCUMENTATION:
-  https://github.com/JosXa/git-permachine
+  https://github.com/JosXa/permachine
   `);
 }
 

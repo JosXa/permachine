@@ -25,8 +25,8 @@ Thank you for your interest in contributing to `permachine`! This guide covers e
 
 ```bash
 # Clone the repository
-git clone https://github.com/JosXa/git-permachine.git
-cd git-permachine
+git clone https://github.com/JosXa/permachine.git
+cd permachine
 
 # Install dependencies
 bun install
@@ -36,7 +36,7 @@ bun link
 
 # In your target repository
 cd /path/to/your/test/repo
-bun link git-permachine
+bun link permachine
 ```
 
 ### Running Locally
@@ -55,7 +55,7 @@ node dist/cli.js merge
 ## Project Structure
 
 ```
-git-permachine/
+permachine/
 ├── src/
 │   ├── cli.ts                      # CLI entry point, argument parsing
 │   ├── core/
@@ -515,8 +515,8 @@ npm publish --access public --otp=XXXXXX
 git push --tags
 
 # 5. Update global installation (for testing)
-npm uninstall -g git-permachine
-npm install -g git-permachine
+npm uninstall -g permachine
+npm install -g permachine
 ```
 
 ### Versioning
@@ -650,8 +650,8 @@ adding to .gitignore to ensure cross-platform compatibility.
 
 ## Questions?
 
-- **Issues:** https://github.com/JosXa/git-permachine/issues
-- **Discussions:** https://github.com/JosXa/git-permachine/discussions
+- **Issues:** https://github.com/JosXa/permachine/issues
+- **Discussions:** https://github.com/JosXa/permachine/discussions
 - **Email:** [Create an issue instead]
 
 Thank you for contributing! 🎉

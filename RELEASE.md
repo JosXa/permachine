@@ -38,7 +38,7 @@ Before the workflow can publish to npm, you need to add an `NPM_TOKEN` secret to
    - Copy the generated token
 
 2. **Add secret to GitHub**:
-   - Go to https://github.com/JosXa/git-permachine/settings/secrets/actions
+   - Go to https://github.com/JosXa/permachine/settings/secrets/actions
    - Click "New repository secret"
    - Name: `NPM_TOKEN`
    - Value: Paste your npm token

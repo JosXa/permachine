@@ -39,7 +39,7 @@ jobs:
           body: |
             ## Installation
             ```bash
-            npm install -g git-permachine@${{ github.ref_name }}
+            npm install -g permachine@${{ github.ref_name }}
             ```
           draft: false
           prerelease: false

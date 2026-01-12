@@ -2,7 +2,7 @@
 
 Per-machine config management with git for tools that don't support it natively. Automatically merge machine-specific configurations with a base config.
 
-[![npm version](https://img.shields.io/npm/v/git-permachine.svg)](https://www.npmjs.com/package/git-permachine)
+[![npm version](https://img.shields.io/npm/v/permachine.svg)](https://www.npmjs.com/package/permachine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Problem
@@ -28,7 +28,7 @@ When syncing dotfiles across multiple machines, you often need:
 
 ```bash
 # Install globally
-npm install -g git-permachine
+npm install -g permachine
 
 # In your repository
 cd /path/to/your/repo
@@ -143,33 +143,6 @@ permachine watch
 
 - Watches all base and machine-specific files for changes
 - Automatically merges when you save any watched file
-- Debounces rapid changes to prevent redundant merges
-- Runs continuously until you stop it (Ctrl+C)
-
-**Perfect for development** - just leave it running and your configs stay up-to-date as you type.
-
-**Example output:**
-
-```
-✓ Machine detected: laptop
-✓ Watching 4 file(s) for changes...
-  - config.base.json
-  - config.laptop.json
-  - .env.base
-  - .env.laptop
-
-[12:34:56] Changed: config.laptop.json
-[12:34:56] Merged config.base.json + config.laptop.json → config.json
-✓ Ready
-
-^C
-✓ Stopped watching
-```
-
-**Options:**
-
-- `--debounce <ms>` - Adjust debounce delay (default: 300ms)
-- `--verbose` - Show detailed file change events
 
 #### Check Setup
 

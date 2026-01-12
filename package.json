@@ -1,6 +1,6 @@
 {
-  "name": "git-permachine",
-  "version": "0.1.4",
+  "name": "permachine",
+  "version": "0.2.0",
   "description": "Automatically merge machine-specific config files with base configs using git hooks",
   "type": "module",
   "bin": {
@@ -31,12 +31,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JosXa/git-permachine.git"
+    "url": "https://github.com/JosXa/permachine.git"
   },
   "bugs": {
-    "url": "https://github.com/JosXa/git-permachine/issues"
+    "url": "https://github.com/JosXa/permachine/issues"
   },
-  "homepage": "https://github.com/JosXa/git-permachine#readme",
+  "homepage": "https://github.com/JosXa/permachine#readme",
   "files": [
     "dist",
     "templates",
