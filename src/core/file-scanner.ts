@@ -7,6 +7,8 @@ import {
   getBaseFilename,
   isLegacyFilename,
   convertLegacyFilename,
+  createCustomContext,
+  matchFilters,
 } from './file-filters.js';
 import { getMachineName } from './machine-detector.js';
 
@@ -60,6 +62,9 @@ export async function scanForMergeOperations(
   // Remove duplicates
   const uniqueFiles = [...new Set(foundFiles)];
 
+  // Create custom context with the provided machine name
+  const context = createCustomContext({ machine: machineName });
+
   // Filter files that match current context
   for (const file of uniqueFiles) {
     // Check if this file uses new filter syntax and matches current context
@@ -73,8 +78,9 @@ export async function scanForMergeOperations(
     let shouldProcess = false;
     
     if (hasFilters(basename)) {
-      // New syntax - check if it matches current context
-      shouldProcess = isMatch(basename);
+      // New syntax - check if it matches current context with custom machine name
+      const result = matchFilters(basename, context);
+      shouldProcess = result.matches;
     } else if (isLegacyFilename(basename, machineName)) {
       // Legacy syntax - always process if it matches machine name
       shouldProcess = true;
