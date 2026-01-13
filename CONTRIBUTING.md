@@ -648,6 +648,20 @@ adding to .gitignore to ensure cross-platform compatibility.
 3. You address feedback
 4. Maintainer approves and merges
 
+## Future Features & Open Questions
+
+See the [GitHub issues](https://github.com/JosXa/permachine/issues) for planned features and open design questions:
+
+- [#1 - YAML Support](https://github.com/JosXa/permachine/issues/1)
+- [#2 - TOML Support](https://github.com/JosXa/permachine/issues/2)
+- [#3 - Markdown File Support](https://github.com/JosXa/permachine/issues/3)
+- [#4 - Patch File Support (RFC)](https://github.com/JosXa/permachine/issues/4) - Request for Comments on design decisions
+- [#5 - Custom Merge Strategies](https://github.com/JosXa/permachine/issues/5)
+- [#6 - Configuration File for Patterns](https://github.com/JosXa/permachine/issues/6)
+- [#7 - Dry-Run Mode](https://github.com/JosXa/permachine/issues/7)
+
+If you're interested in implementing any of these features, please comment on the corresponding issue to discuss the approach before submitting a PR.
+
 ## Questions?
 
 - **Issues:** https://github.com/JosXa/permachine/issues
