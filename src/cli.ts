@@ -4,8 +4,7 @@ import minimist from 'minimist';
 import { getMachineName } from './core/machine-detector.js';
 import { scanForMergeOperations } from './core/file-scanner.js';
 import { performAllMerges } from './core/merger.js';
-import { installHooks, uninstallHooks } from './core/git-hooks.js';
-import { manageGitignore } from './core/gitignore-manager.js';
+import { manageGitignore, isFileTrackedByGit } from './core/gitignore-manager.js';
 import { startWatcher } from './core/watcher.js';
 import { logger } from './utils/logger.js';
 import fs from 'node:fs/promises';
@@ -19,7 +18,7 @@ const __dirname = path.dirname(__filename);
 /**
  * Check which output files already exist
  */
-async function checkExistingOutputFiles(operations: any[]): Promise<string[]> {
+async function checkExistingOutputFiles(operations: MergeOperation[]): Promise<string[]> {
   const existing: string[] = [];
   for (const op of operations) {
     try {
@@ -30,6 +29,28 @@ async function checkExistingOutputFiles(operations: any[]): Promise<string[]> {
     }
   }
   return existing;
+}
+
+/**
+ * Check which output files are tracked by git
+ */
+async function checkTrackedOutputFiles(operations: MergeOperation[]): Promise<string[]> {
+  const tracked: string[] = [];
+  const cwd = process.cwd();
+  
+  for (const op of operations) {
+    try {
+      await fs.access(op.outputPath);
+      const relativePath = path.relative(cwd, op.outputPath);
+      const isTracked = await isFileTrackedByGit(relativePath, cwd);
+      if (isTracked) {
+        tracked.push(op.outputPath);
+      }
+    } catch {
+      // File doesn't exist, so it can't be tracked
+    }
+  }
+  return tracked;
 }
 
 /**
@@ -117,13 +138,13 @@ async function handleInit(argv: any) {
     if (operations.length > 0) {
       logger.info(`Found ${operations.length} machine-specific file(s)`);
       
-      // Check which output files already exist
-      const existingFiles = await checkExistingOutputFiles(operations);
+      // Check which output files are tracked by git
+      const trackedFiles = await checkTrackedOutputFiles(operations);
       
-      if (existingFiles.length > 0 && !argv['no-gitignore']) {
+      if (trackedFiles.length > 0 && !argv['no-gitignore']) {
         // Show warning about files that will be affected
         logger.warn('⚠️  Warning: The following files will be overwritten and untracked from git:');
-        for (const file of existingFiles) {
+        for (const file of trackedFiles) {
           logger.warn(`  - ${path.relative(process.cwd(), file)}`);
         }
         logger.info('');
@@ -204,14 +225,14 @@ async function handleMerge(argv: any) {
       return;
     }
 
-    // Check which output files already exist (only prompt if not silent)
+    // Check which output files are tracked by git (only prompt if not silent)
     if (!argv.silent && !argv['no-gitignore']) {
-      const existingFiles = await checkExistingOutputFiles(operations);
+      const trackedFiles = await checkTrackedOutputFiles(operations);
       
-      if (existingFiles.length > 0) {
+      if (trackedFiles.length > 0) {
         // Show warning about files that will be affected
         logger.warn('⚠️  Warning: The following files will be overwritten and untracked from git:');
-        for (const file of existingFiles) {
+        for (const file of trackedFiles) {
           logger.warn(`  - ${path.relative(process.cwd(), file)}`);
         }
         logger.info('');

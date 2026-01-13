@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { TestRepo, createTestFiles } from '../helpers/test-repo';
-import { manageGitignore } from '../../src/core/gitignore-manager';
+import { manageGitignore, isFileTrackedByGit } from '../../src/core/gitignore-manager';
 import path from 'node:path';
 
 describe('gitignore manager', () => {
@@ -262,5 +262,39 @@ dist/
     const lines = gitignore.split('\n');
     const configLines = lines.filter(l => l.trim() === 'config.json');
     expect(configLines.length).toBe(1); // Only one occurrence
+  });
+
+  test('isFileTrackedByGit should return true for tracked files', async () => {
+    await createTestFiles(repo, {
+      'tracked.json': JSON.stringify({ test: true }),
+    });
+    await repo.commit('Add tracked file');
+
+    const isTracked = await isFileTrackedByGit('tracked.json', repo.path);
+    expect(isTracked).toBe(true);
+  });
+
+  test('isFileTrackedByGit should return false for untracked files', async () => {
+    await createTestFiles(repo, {
+      'untracked.json': JSON.stringify({ test: true }),
+    });
+
+    const isTracked = await isFileTrackedByGit('untracked.json', repo.path);
+    expect(isTracked).toBe(false);
+  });
+
+  test('isFileTrackedByGit should return false for gitignored files', async () => {
+    await createTestFiles(repo, {
+      '.gitignore': 'ignored.json\n',
+      'ignored.json': JSON.stringify({ test: true }),
+    });
+
+    const isTracked = await isFileTrackedByGit('ignored.json', repo.path);
+    expect(isTracked).toBe(false);
+  });
+
+  test('isFileTrackedByGit should return false for non-existent files', async () => {
+    const isTracked = await isFileTrackedByGit('does-not-exist.json', repo.path);
+    expect(isTracked).toBe(false);
   });
 });

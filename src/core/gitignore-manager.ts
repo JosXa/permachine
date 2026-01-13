@@ -105,7 +105,7 @@ export async function manageGitignore(
 /**
  * Check if a file is tracked by git
  */
-async function isFileTrackedByGit(filePath: string, cwd: string): Promise<boolean> {
+export async function isFileTrackedByGit(filePath: string, cwd: string): Promise<boolean> {
   try {
     await execAsync(`git ls-files --error-unmatch "${filePath}"`, { cwd });
     return true;
