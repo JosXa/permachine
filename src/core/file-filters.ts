@@ -5,6 +5,7 @@
  *   config.{os=windows}.json
  *   secrets.{machine=work-laptop}{user=josxa}.env
  *   app.{env=prod}{arch=x64}.json
+ *   file.{base}.json  (placeholder that references the base filename)
  * 
  * Future enhancements:
  *   - Negation: {os!=windows}
@@ -59,7 +60,8 @@ export interface FilterContext {
  */
 export interface ParseResult {
   filters: Filter[];
-  baseFilename: string; // Filename with all filters removed
+  baseFilename: string; // Filename with all filters and placeholders removed
+  hasBasePlaceholder: boolean; // Whether the filename contains {base} placeholder
 }
 
 /**
@@ -147,6 +149,11 @@ export function createCustomContext(overrides: Partial<FilterContext>): FilterCo
 const FILTER_REGEX = /\{([a-zA-Z0-9_-]+)(=|!=|~|\^)([a-zA-Z0-9_*.,\-]+)\}/g;
 
 /**
+ * Regular expression to match {base} placeholder
+ */
+const BASE_PLACEHOLDER_REGEX = /\{base\}/gi;
+
+/**
  * Parse filters from a filename
  * 
  * Example:
@@ -156,12 +163,24 @@ const FILTER_REGEX = /\{([a-zA-Z0-9_-]+)(=|!=|~|\^)([a-zA-Z0-9_*.,\-]+)\}/g;
  *          { key: 'os', operator: '=', value: 'windows', raw: '{os=windows}' },
  *          { key: 'arch', operator: '=', value: 'x64', raw: '{arch=x64}' }
  *        ],
- *        baseFilename: 'config.json'
+ *        baseFilename: 'config.json',
+ *        hasBasePlaceholder: false
+ *      }
+ * 
+ *   parseFilters('file.{base}.json')
+ *   -> {
+ *        filters: [],
+ *        baseFilename: 'file.json',
+ *        hasBasePlaceholder: true
  *      }
  */
 export function parseFilters(filename: string): ParseResult {
   const filters: Filter[] = [];
   let match: RegExpExecArray | null;
+
+  // Check for {base} placeholder (reset regex state first)
+  BASE_PLACEHOLDER_REGEX.lastIndex = 0;
+  const hasBasePlaceholder = BASE_PLACEHOLDER_REGEX.test(filename);
 
   // Reset regex state
   FILTER_REGEX.lastIndex = 0;
@@ -177,22 +196,30 @@ export function parseFilters(filename: string): ParseResult {
     });
   }
 
-  // Remove all filters from filename to get base
+  // Remove all filters and {base} placeholders from filename to get base
   // Also remove the dot before the filter if it exists
-  let baseFilename = filename.replace(/\.?\{[^}]+\}/g, '');
+  let baseFilename = filename
+    .replace(/\.?\{[^}]+\}/g, '');
   
   // Clean up any double dots that may result
   baseFilename = baseFilename.replace(/\.{2,}/g, '.');
 
-  return { filters, baseFilename };
+  return { filters, baseFilename, hasBasePlaceholder };
 }
 
 /**
- * Check if a filename contains any filters
+ * Check if a filename contains any filters or placeholders
  */
 export function hasFilters(filename: string): boolean {
+  // Check for filter syntax
   FILTER_REGEX.lastIndex = 0;
-  return FILTER_REGEX.test(filename);
+  const hasFilterSyntax = FILTER_REGEX.test(filename);
+  
+  // Check for {base} placeholder
+  BASE_PLACEHOLDER_REGEX.lastIndex = 0;
+  const hasBasePlaceholder = BASE_PLACEHOLDER_REGEX.test(filename);
+  
+  return hasFilterSyntax || hasBasePlaceholder;
 }
 
 /**
@@ -201,6 +228,40 @@ export function hasFilters(filename: string): boolean {
 export function extractFilterStrings(filename: string): string[] {
   const { filters } = parseFilters(filename);
   return filters.map(f => f.raw);
+}
+
+/**
+ * Expand {base} placeholder in a filename with the actual base filename
+ * 
+ * The {base} placeholder is replaced with the filename part before the first placeholder/filter.
+ * This allows referencing the base filename within the filename itself.
+ * 
+ * Example:
+ *   expandBasePlaceholder('file.{base}.json') -> 'file.file.json'
+ *   expandBasePlaceholder('config.{os=windows}.{base}.json') -> 'config.{os=windows}.config.json'
+ */
+export function expandBasePlaceholder(filename: string): string {
+  const { hasBasePlaceholder } = parseFilters(filename);
+  
+  if (!hasBasePlaceholder) {
+    return filename;
+  }
+  
+  // Extract the part before the first { character - this is our base name
+  const firstBraceIndex = filename.indexOf('{');
+  if (firstBraceIndex === -1) {
+    return filename;
+  }
+  
+  // Get the base part (everything before the first '{'), removing trailing dot if present
+  let basePart = filename.substring(0, firstBraceIndex);
+  if (basePart.endsWith('.')) {
+    basePart = basePart.substring(0, basePart.length - 1);
+  }
+  
+  // Replace all {base} placeholders with this base part
+  BASE_PLACEHOLDER_REGEX.lastIndex = 0;
+  return filename.replace(BASE_PLACEHOLDER_REGEX, basePart);
 }
 
 // ============================================================================

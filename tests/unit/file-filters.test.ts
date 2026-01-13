@@ -3,6 +3,7 @@ import {
   parseFilters,
   hasFilters,
   extractFilterStrings,
+  expandBasePlaceholder,
   getFilterContext,
   resetFilterContext,
   createCustomContext,
@@ -81,6 +82,30 @@ describe('parseFilters', () => {
     expect(result.filters).toHaveLength(1);
     expect(result.baseFilename).toBe('backup.tar.gz');
   });
+
+  test('detects {base} placeholder', () => {
+    const result = parseFilters('file.{base}.json');
+    
+    expect(result.hasBasePlaceholder).toBe(true);
+    expect(result.baseFilename).toBe('file.json');
+    expect(result.filters).toHaveLength(0);
+  });
+
+  test('handles {base} with filters', () => {
+    const result = parseFilters('config.{os=windows}.{base}.json');
+    
+    expect(result.hasBasePlaceholder).toBe(true);
+    expect(result.baseFilename).toBe('config.json');
+    expect(result.filters).toHaveLength(1);
+  });
+
+  test('{base} placeholder is case-insensitive', () => {
+    const result1 = parseFilters('file.{BASE}.json');
+    const result2 = parseFilters('file.{Base}.json');
+    
+    expect(result1.hasBasePlaceholder).toBe(true);
+    expect(result2.hasBasePlaceholder).toBe(true);
+  });
 });
 
 describe('hasFilters', () => {
@@ -106,6 +131,52 @@ describe('extractFilterStrings', () => {
     const filters = extractFilterStrings('config.json');
     
     expect(filters).toEqual([]);
+  });
+});
+
+describe('expandBasePlaceholder', () => {
+  test('expands {base} placeholder to base filename', () => {
+    const result = expandBasePlaceholder('file.{base}.json');
+    
+    expect(result).toBe('file.file.json');
+  });
+
+  test('expands {base} with filters present', () => {
+    const result = expandBasePlaceholder('config.{os=windows}.{base}.json');
+    
+    expect(result).toBe('config.{os=windows}.config.json');
+  });
+
+  test('returns original filename if no {base} placeholder', () => {
+    const result = expandBasePlaceholder('config.{os=windows}.json');
+    
+    expect(result).toBe('config.{os=windows}.json');
+  });
+
+  test('handles multiple {base} placeholders', () => {
+    const result = expandBasePlaceholder('file.{base}.{base}.json');
+    
+    expect(result).toBe('file.file.file.json');
+  });
+
+  test('handles {BASE} case-insensitive', () => {
+    const result1 = expandBasePlaceholder('file.{BASE}.json');
+    const result2 = expandBasePlaceholder('file.{Base}.json');
+    
+    expect(result1).toBe('file.file.json');
+    expect(result2).toBe('file.file.json');
+  });
+
+  test('expands {base} in dotfiles', () => {
+    const result = expandBasePlaceholder('.env.{base}');
+    
+    expect(result).toBe('.env..env');
+  });
+
+  test('complex scenario with filters before and after {base}', () => {
+    const result = expandBasePlaceholder('app.{env=prod}.{base}.{machine=laptop}.json');
+    
+    expect(result).toBe('app.{env=prod}.app.{machine=laptop}.json');
   });
 });
 

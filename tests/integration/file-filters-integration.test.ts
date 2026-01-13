@@ -151,6 +151,56 @@ describe('file-filters integration', () => {
     expect(path.basename(operations[0].outputPath)).toBe('secrets.json');
   });
 
+  test('supports {base} placeholder in filenames', async () => {
+    // Create a file using {base} placeholder
+    await testRepo.writeFile(
+      'config.{base}.json',
+      '{"placeholder": "test"}'
+    );
+    await testRepo.writeFile('config.base.json', '{"shared": true}');
+
+    const operations = await scanForMergeOperations('homezone', testRepo.path);
+
+    // Should find config.{base}.json which becomes config.config.json
+    expect(operations).toHaveLength(1);
+    expect(operations[0].machinePath).toContain('config.{base}.json');
+    expect(operations[0].outputPath).toContain('config.json');
+  });
+
+  test('{base} placeholder with filters', async () => {
+    // Create a file using {base} with filters
+    await testRepo.writeFile(
+      `config.{os=${context.os}}.{base}.json`,
+      '{"filtered": "value"}'
+    );
+    await testRepo.writeFile('config.base.json', '{"shared": true}');
+
+    const operations = await scanForMergeOperations('homezone', testRepo.path);
+
+    // Should find the file with matching OS filter
+    expect(operations).toHaveLength(1);
+    expect(operations[0].machinePath).toContain(`config.{os=${context.os}}.{base}.json`);
+  });
+
+  test('{base} placeholder is case-insensitive', async () => {
+    // Create files with different case variations
+    await testRepo.writeFile(
+      'file1.{BASE}.json',
+      '{"case": "upper"}'
+    );
+    await testRepo.writeFile(
+      'file2.{Base}.json',
+      '{"case": "mixed"}'
+    );
+    await testRepo.writeFile('file1.base.json', '{"shared": "1"}');
+    await testRepo.writeFile('file2.base.json', '{"shared": "2"}');
+
+    const operations = await scanForMergeOperations('homezone', testRepo.path);
+
+    // Should find both files regardless of case
+    expect(operations).toHaveLength(2);
+  });
+
   // Wildcard test skipped: tilde character not allowed in Windows filenames
   // Wildcard matching logic is thoroughly tested in unit tests
 });
