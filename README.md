@@ -186,12 +186,13 @@ Different settings for work laptop vs home desktop:
   └── settings.json              # ← Merged output (gitignored)
 ```
 
-**setup.base.json:**
+**settings.base.json:**
 
 ```json
 {
   "editor.fontSize": 14,
-  "workbench.colorTheme": "Dark+"
+  "workbench.colorTheme": "Dark+",
+  "terminal.integrated.shell.windows": "powershell.exe"
 }
 ```
 
@@ -200,34 +201,92 @@ Different settings for work laptop vs home desktop:
 ```json
 {
   "http.proxy": "http://proxy.company.com:8080",
-  "terminal.integrated.cwd": "C:/Projects"
+  "terminal.integrated.cwd": "C:/Projects/Work"
 }
 ```
 
-### Recipe 2: Environment Variables
+**settings.desktop.json:**
 
-Different database credentials per environment:
-
-```bash
-# .env.base (shared defaults)
-NODE_ENV=development
-LOG_LEVEL=info
-API_PORT=3000
-
-# .env.laptop (local dev)
-DATABASE_URL=postgresql://localhost:5432/myapp_dev
-API_KEY=dev_key_123
-
-# .env.prodserver (production)
-DATABASE_URL=postgresql://prod.db.com:5432/myapp
-API_KEY=prod_key_xyz
-
-# .env ← Merged output (gitignored)
+```json
+{
+  "terminal.integrated.cwd": "C:/Code/Personal",
+  "git.path": "C:/Program Files/Git/bin/git.exe"
+}
 ```
 
-### Recipe 3: Package.json Scripts
+### Recipe 2: OpenCode Config (AI Assistant)
 
-Different build scripts for different machines:
+[OpenCode](https://opencode.ai) supports machine-specific MCP servers and model preferences:
+
+```bash
+~/.config/opencode/
+  ├── config.base.json         # Shared: agents, themes, keybinds
+  ├── config.worklaptop.json   # Work: Google Sheets MCP
+  ├── config.homezone.json     # Home: Telegram MCP, local paths
+  └── config.json              # ← Merged output (gitignored)
+```
+
+**config.base.json:**
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "theme": "nightowl-transparent",
+  "keybinds": {
+    "input_newline": "shift+return"
+  },
+  "mcp": {
+    "perplexity-mcp": {
+      "enabled": true,
+      "type": "local",
+      "command": ["uvx", "perplexity-mcp"]
+    }
+  }
+}
+```
+
+**config.homezone.json:**
+
+```json
+{
+  "mcp": {
+    "telegram-mcp": {
+      "enabled": true,
+      "type": "local",
+      "command": ["uv", "--directory", "D:\\git\\telegram-mcp", "run", "main.py"]
+    },
+    "google-sheets": {
+      "enabled": true,
+      "environment": {
+        "SERVICE_ACCOUNT_PATH": "C:/Users/josch/.config/opencode/secrets/service-account.json"
+      }
+    }
+  }
+}
+```
+
+**config.worklaptop.json:**
+
+```json
+{
+  "mcp": {
+    "telegram-mcp": {
+      "enabled": false
+    },
+    "google-sheets": {
+      "enabled": true,
+      "environment": {
+        "SERVICE_ACCOUNT_PATH": "/work/credentials/google-service-account.json",
+        "DRIVE_FOLDER_ID": "work-folder-id-123"
+      }
+    }
+  }
+}
+```
+
+### Recipe 3: Package.json Scripts (Platform-Specific)
+
+Different scripts for macOS vs Windows development:
 
 ```bash
 # package.base.json
@@ -235,97 +294,93 @@ Different build scripts for different machines:
   "name": "my-app",
   "version": "1.0.0",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "express": "^4.18.0"
   }
 }
 
-# package.laptop.json (local development)
+# package.macos.json
 {
   "scripts": {
-    "dev": "nodemon src/index.js",
-    "build": "webpack --mode development"
+    "dev": "NODE_ENV=development nodemon src/index.js",
+    "build": "rm -rf dist && webpack",
+    "open": "open http://localhost:3000"
   }
 }
 
-# package.buildserver.json (CI/CD)
+# package.windows.json
 {
   "scripts": {
-    "build": "webpack --mode production",
-    "deploy": "aws s3 sync dist/ s3://my-bucket"
+    "dev": "set NODE_ENV=development && nodemon src/index.js",
+    "build": "rmdir /s /q dist && webpack",
+    "open": "start http://localhost:3000"
   }
 }
 
 # package.json ← Merged output
-# Each machine gets appropriate scripts!
+# Each OS gets appropriate shell commands!
 ```
 
-### Recipe 4: Database Configuration
+### Recipe 4: Git Config
 
-Multi-environment database setup:
+Personal vs work Git settings:
 
 ```bash
-# config/database.base.json
-{
-  "pool": {
-    "min": 2,
-    "max": 10
-  },
-  "migrations": {
-    "directory": "./migrations"
-  }
-}
+# .gitconfig.base
+[core]
+  editor = code --wait
+  autocrlf = true
+[pull]
+  rebase = true
+[init]
+  defaultBranch = main
 
-# config/database.laptop.json
-{
-  "connection": {
-    "host": "localhost",
-    "port": 5432,
-    "database": "myapp_dev",
-    "user": "dev",
-    "password": "dev123"
-  }
-}
+# .gitconfig.worklaptop
+[user]
+  name = John Doe
+  email = john.doe@company.com
+[url "https://"]
+  insteadOf = git://
+[http]
+  proxy = http://proxy.company.com:8080
 
-# config/database.prodserver.json
-{
-  "connection": {
-    "host": "db.production.com",
-    "port": 5432,
-    "database": "myapp_production",
-    "user": "produser",
-    "password": "secure_password_from_vault"
-  },
-  "pool": {
-    "min": 10,
-    "max": 50
-  }
-}
+# .gitconfig.homezone
+[user]
+  name = JohnD
+  email = johndoe@personal.com
+[github]
+  user = johnd-personal
 ```
 
-### Recipe 5: Multi-File Projects
+### Recipe 5: Multi-File Dotfiles
 
-Complex projects with multiple config files:
+Complete dotfiles setup across machines:
 
 ```bash
-project/
-├── config.base.json
-├── config.laptop.json
-├── settings/
-│   ├── app.base.json
-│   ├── app.laptop.json
-│   ├── database.base.json
-│   └── database.laptop.json
-├── .env.base
-└── .env.laptop
+~/.config/
+├── nvim/
+│   ├── init.base.vim        # Shared vim config
+│   ├── init.worklaptop.vim  # Work-specific plugins
+│   ├── init.homezone.vim    # Personal plugins
+│   └── init.vim             # ← Merged
+├── alacritty/
+│   ├── alacritty.base.yml   # Shared terminal config
+│   ├── alacritty.macos.yml  # macOS font paths
+│   ├── alacritty.windows.yml # Windows font paths
+│   └── alacritty.yml        # ← Merged
+├── opencode/
+│   ├── config.base.json
+│   ├── config.worklaptop.json
+│   └── config.json          # ← Merged
+└── .env.base
+    .env.worklaptop
+    .env                     # ← Merged
 
-# After `permachine init`, all files auto-merge:
-# - config.json
-# - settings/app.json
-# - settings/database.json
-# - .env
+# After `permachine init`, sync your dotfiles repo across machines!
+# Each machine automatically gets the right config.
 ```
 
 ## How It Works
@@ -349,13 +404,15 @@ For detailed implementation information, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Supported File Types
 
-| Type  | Extensions            | Merge Strategy                    | Status       |
-| ----- | --------------------- | --------------------------------- | ------------ |
-| JSON  | `.json`               | Deep recursive merge              | ✅ Supported |
-| JSONC | `.json` with comments | Deep merge + comment preservation | ✅ Supported |
-| ENV   | `.env`, `.env.*`      | Key-value override                | ✅ Supported |
-| YAML  | `.yaml`, `.yml`       | Deep recursive merge              | 🔜 Planned   |
-| TOML  | `.toml`               | Deep recursive merge              | 🔜 Planned   |
+| Type     | Extensions            | Merge Strategy                    | Status                                         |
+| -------- | --------------------- | --------------------------------- | ---------------------------------------------- |
+| JSON     | `.json`               | Deep recursive merge              | ✅ Supported                                   |
+| JSONC    | `.json` with comments | Deep merge + comment preservation | ✅ Supported                                   |
+| ENV      | `.env`, `.env.*`      | Key-value upsert                  | ✅ Supported                                   |
+| Markdown | `.md`                 | Append (base + machine)           | 🔜 [Planned](#3)                               |
+| YAML     | `.yaml`, `.yml`       | Deep recursive merge              | 🔜 [Planned](#1)                               |
+| TOML     | `.toml`               | Deep recursive merge              | 🔜 [Planned](#2)                               |
+| Patch    | `.patch`              | Apply git-style patch to base     | 💡 [Proposed](#4) |
 
 ## Troubleshooting
 
@@ -460,11 +517,13 @@ MIT © [JosXa](https://github.com/JosXa)
 - [x] Comprehensive tests (81 tests)
 - [x] npm package publication
 - [x] Watch mode for development
-- [ ] YAML support
-- [ ] TOML support
-- [ ] Custom merge strategies
-- [ ] Config file for patterns
-- [ ] Dry-run mode
+- [ ] YAML support ([#1](https://github.com/JosXa/permachine/issues/1))
+- [ ] TOML support ([#2](https://github.com/JosXa/permachine/issues/2))
+- [ ] Markdown support ([#3](https://github.com/JosXa/permachine/issues/3))
+- [ ] Patch file support ([#4](https://github.com/JosXa/permachine/issues/4))
+- [ ] Custom merge strategies ([#5](https://github.com/JosXa/permachine/issues/5))
+- [ ] Config file for patterns ([#6](https://github.com/JosXa/permachine/issues/6))
+- [ ] Dry-run mode ([#7](https://github.com/JosXa/permachine/issues/7))
 
 ## Credits
 
