@@ -77,6 +77,20 @@ EXAMPLES:
 
 ### File Naming Convention
 
+**New Advanced Syntax (Recommended):**
+
+Filter-based syntax for precise control:
+
+| Purpose               | Filename                      | In Git?            |
+| --------------------- | ----------------------------- | ------------------ |
+| Base config (shared)  | `config.base.json`            | ✅ Yes             |
+| OS-specific           | `config.{os=windows}.json`    | ✅ Yes             |
+| Machine-specific      | `config.{machine=laptop}.json`| ✅ Yes             |
+| Multi-filter          | `secrets.{machine=laptop}{user=josxa}.json` | ✅ Yes |
+| Final output (merged) | `config.json`                 | ❌ No (gitignored) |
+
+**Legacy Syntax (Still Supported):**
+
 Given machine name `my-laptop` (auto-detected from hostname):
 
 | Purpose               | Filename                | In Git?            |
@@ -85,13 +99,25 @@ Given machine name `my-laptop` (auto-detected from hostname):
 | Machine-specific      | `config.my-laptop.json` | ✅ Yes             |
 | Final output (merged) | `config.json`           | ❌ No (gitignored) |
 
+**Supported Filters:**
+
+- `{os=windows}`, `{os=macos}`, `{os=linux}` - Operating system
+- `{arch=x64}`, `{arch=arm64}` - CPU architecture  
+- `{machine=hostname}` - Machine/hostname (same as legacy)
+- `{user=username}` - Username
+- `{env=prod}`, `{env=dev}` - Environment (from NODE_ENV)
+- Multiple filters: `{os=windows}{arch=x64}` (AND logic)
+- OR logic: `{os=windows,macos,linux}` (comma-separated)
+
+**📚 See [File Filters Documentation](docs/FILE_FILTERS.md) for complete guide and examples.**
+
 Same pattern works for `.env` files:
 
-| Purpose          | Filename         | In Git?            |
-| ---------------- | ---------------- | ------------------ |
-| Base config      | `.env.base`      | ✅ Yes             |
-| Machine-specific | `.env.my-laptop` | ✅ Yes             |
-| Final output     | `.env`           | ❌ No (gitignored) |
+| Purpose          | Filename                   | In Git?            |
+| ---------------- | -------------------------- | ------------------ |
+| Base config      | `.env.base`                | ✅ Yes             |
+| Machine-specific | `.env.{machine=laptop}`    | ✅ Yes             |
+| Final output     | `.env`                     | ❌ No (gitignored) |
 
 ### Basic Commands
 
@@ -383,24 +409,66 @@ Complete dotfiles setup across machines:
 # Each machine automatically gets the right config.
 ```
 
+### Recipe 6: Advanced Filters - Cross-Platform Development
+
+**NEW**: Use the advanced filter syntax for precise control:
+
+```bash
+# Project structure
+project/
+├── config.base.json                    # Shared config
+├── config.{os=windows}.json            # Windows-specific paths
+├── config.{os=macos}.json              # macOS-specific paths
+├── config.{os=linux}.json              # Linux-specific paths
+├── secrets.{machine=work}{user=alice}.json   # Alice's work secrets
+├── secrets.{machine=home}{user=alice}.json   # Alice's home secrets
+├── build.{os=windows}{arch=x64}.json   # Windows x64 build config
+├── build.{os=windows}{arch=arm64}.json # Windows ARM build config
+└── config.json                         # ← Merged (gitignored)
+```
+
+**Example use cases:**
+
+```bash
+# Multiple platforms with OR logic
+package.{os=windows,macos}.json   # Matches Windows OR macOS
+
+# Specific environment AND machine
+secrets.{env=prod}{machine=server-us-east}.json
+
+# User-specific on specific machine
+.vscode/settings.{machine=laptop}{user=josxa}.json
+
+# Multiple users on shared machine
+preferences.{user=alice}.json
+preferences.{user=bob}.json
+```
+
+**See [File Filters Documentation](docs/FILE_FILTERS.md) for complete guide and examples.**
+
 ## How It Works
 
-`permachine` uses a simple three-step process:
+`permachine` uses a simple process:
 
-1. **Machine Detection** - Automatically detects your machine name from hostname (Windows: `COMPUTERNAME`, Linux/Mac: `hostname()`)
+1. **Machine Detection** - Automatically detects your machine name from hostname (Windows: `COMPUTERNAME`, Linux/Mac: `hostname()`) and other system properties (OS, architecture, username, environment)
 
-2. **File Discovery** - Scans your repository for files matching the pattern `*.{machine}.*` (e.g., `config.laptop.json`, `.env.desktop`)
+2. **File Discovery** - Scans your repository for files matching patterns:
+   - **New**: `{key=value}` syntax (e.g., `config.{os=windows}.json`, `secrets.{machine=laptop}{user=josxa}.json`)
+   - **Legacy**: `*.{machine}.*` syntax (e.g., `config.laptop.json`, `.env.desktop`)
 
-3. **Smart Merging** - Merges base and machine-specific configs:
+3. **Filter Matching** - For new syntax, evaluates filters against current system context:
+   - AND logic: ALL filters must match (e.g., `{os=windows}{arch=x64}`)
+   - OR logic: ANY value in list matches (e.g., `{os=windows,macos}`)
 
+4. **Smart Merging** - Merges base and machine-specific configs:
    - **JSON**: Deep recursive merge (machine values override base)
    - **ENV**: Key-value merge with comment preservation
 
-4. **Gitignore Management** - Automatically adds output files to `.gitignore` and removes already-tracked files from git
+5. **Gitignore Management** - Automatically adds output files to `.gitignore` and removes already-tracked files from git
 
-5. **Git Hooks** - Installs hooks to auto-merge on checkout, merge, and commit operations
+6. **Git Hooks** - Installs hooks to auto-merge on checkout, merge, and commit operations
 
-For detailed implementation information, see [CONTRIBUTING.md](CONTRIBUTING.md).
+For detailed implementation information, see [CONTRIBUTING.md](CONTRIBUTING.md) and [File Filters Documentation](docs/FILE_FILTERS.md).
 
 ## Supported File Types
 
