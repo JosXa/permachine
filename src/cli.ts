@@ -72,12 +72,13 @@ async function promptConfirmation(message: string): Promise<boolean> {
 
 async function main() {
   const argv = minimist(process.argv.slice(2), {
-    boolean: ['help', 'version', 'silent', 'legacy', 'auto', 'with-package-json', 'no-gitignore', 'verbose'],
+    boolean: ['help', 'version', 'silent', 'legacy', 'auto', 'with-package-json', 'no-gitignore', 'verbose', 'yes'],
     string: ['debounce'],
     alias: {
       h: 'help',
       v: 'version',
       s: 'silent',
+      y: 'yes',
     },
   });
 
@@ -149,8 +150,8 @@ async function handleInit(argv: any) {
         }
         logger.info('');
         
-        // Prompt for confirmation
-        const confirmed = await promptConfirmation('Do you want to continue?');
+        // Prompt for confirmation (skip if --yes flag is set)
+        const confirmed = argv.yes || await promptConfirmation('Do you want to continue?');
         
         if (!confirmed) {
           logger.info('Aborted.');
@@ -237,8 +238,8 @@ async function handleMerge(argv: any) {
         }
         logger.info('');
         
-        // Prompt for confirmation
-        const confirmed = await promptConfirmation('Do you want to continue?');
+        // Prompt for confirmation (skip if --yes flag is set)
+        const confirmed = argv.yes || await promptConfirmation('Do you want to continue?');
         
         if (!confirmed) {
           logger.info('Aborted.');
@@ -391,6 +392,7 @@ OPTIONS:
   --help, -h          Show this help message
   --version, -v       Show version number
   --silent, -s        Suppress all output except errors (for merge command)
+  --yes, -y           Skip confirmation prompts (for init/merge commands)
   --legacy            Use legacy .git/hooks wrapping (for init command)
   --auto              Auto-detect best installation method (for init command)
   --no-gitignore      Don't manage .gitignore or git tracking (for init/merge commands)
@@ -400,6 +402,7 @@ OPTIONS:
 EXAMPLES:
   permachine init
   permachine merge --silent
+  permachine merge --yes
   permachine info
   permachine uninstall
   permachine watch
