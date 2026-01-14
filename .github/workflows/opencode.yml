@@ -24,7 +24,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
-
+      - name: Generate system instructions via Dotagent
+        run: npx dotagent export --format opencode
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
