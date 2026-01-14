@@ -2,6 +2,15 @@
 alwaysApply: true
 ---
 
+# Package Manager
+
+**ALWAYS use Bun, NEVER npm:**
+- `bun install` not `npm install`
+- `bun add <package>` not `npm install <package>`
+- `bun remove <package>` not `npm uninstall <package>`
+- `bun run <script>` not `npm run <script>`
+- `bun test` not `npm test`
+
 # Release Process
 
 When creating releases for this npm package:

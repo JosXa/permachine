@@ -32,6 +32,8 @@ export async function scanForMergeOperations(
   cwd: string = process.cwd()
 ): Promise<MergeOperation[]> {
   const operations: MergeOperation[] = [];
+  const processedOutputs = new Set<string>(); // Track outputs to avoid duplicates
+  const baseFilesWithMachineFiles = new Set<string>(); // Track base files that have machine-specific versions
   
   // Patterns to find machine-specific files:
   // 1. New filter syntax: **/*{*}*
@@ -81,20 +83,121 @@ export async function scanForMergeOperations(
       // New syntax - check if it matches current context with custom machine name
       const result = matchFilters(basename, context);
       shouldProcess = result.matches;
+      
+      // Even if it doesn't match, track that this base file has machine-specific versions
+      const operation = createMergeOperation(file, machineName, cwd);
+      if (operation && operation.basePath) {
+        baseFilesWithMachineFiles.add(operation.basePath);
+      }
     } else if (isLegacyFilename(basename, machineName)) {
       // Legacy syntax - always process if it matches machine name
       shouldProcess = true;
+      
+      // Track that this base file has machine-specific versions
+      const operation = createMergeOperation(file, machineName, cwd);
+      if (operation && operation.basePath) {
+        baseFilesWithMachineFiles.add(operation.basePath);
+      }
     }
     
     if (shouldProcess) {
       const operation = createMergeOperation(file, machineName, cwd);
       if (operation) {
         operations.push(operation);
+        processedOutputs.add(operation.outputPath);
       }
     }
   }
 
+  // Also scan for base files that don't have a corresponding machine-specific file
+  const basePatterns = [
+    '**/*.base.json',
+    '**/.*.base',
+    '**/.*.base.*',
+  ];
+  
+  for (const pattern of basePatterns) {
+    try {
+      const baseFiles = await glob(pattern, {
+        cwd,
+        ignore: ['node_modules/**', '.git/**', 'dist/**'],
+        dot: true,
+        nodir: true,
+      });
+      
+      for (const baseFile of baseFiles) {
+        const fullPath = path.join(cwd, baseFile);
+        
+        // Skip if this base file has machine-specific versions
+        if (baseFilesWithMachineFiles.has(fullPath)) {
+          continue;
+        }
+        
+        const operation = createBaseOnlyMergeOperation(baseFile, cwd);
+        if (operation && !processedOutputs.has(operation.outputPath)) {
+          operations.push(operation);
+          processedOutputs.add(operation.outputPath);
+        }
+      }
+    } catch (error) {
+      // Ignore glob errors
+    }
+  }
+
   return operations;
+}
+
+/**
+ * Create a merge operation from a base file when no machine-specific file exists
+ */
+function createBaseOnlyMergeOperation(
+  baseFile: string,
+  cwd: string
+): MergeOperation | null {
+  const dir = path.dirname(baseFile);
+  const fullBasename = path.basename(baseFile);
+
+  // Determine file type
+  let type: 'json' | 'env' | 'unknown';
+  let ext: string;
+  
+  if (fullBasename.endsWith('.base.json')) {
+    type = 'json';
+    ext = '.json';
+  } else if (fullBasename.startsWith('.') && fullBasename.includes('.base')) {
+    type = 'env';
+    ext = '';
+  } else {
+    type = 'unknown';
+    ext = path.extname(baseFile);
+  }
+
+  // Only handle supported types
+  if (type === 'unknown') {
+    return null;
+  }
+
+  // Derive output name from base name
+  let outputName: string;
+  
+  if (type === 'env') {
+    // .env.base -> .env
+    outputName = fullBasename.replace('.base', '');
+  } else {
+    // config.base.json -> config.json
+    outputName = fullBasename.replace('.base', '');
+  }
+
+  // Construct full paths
+  const basePath = path.join(cwd, baseFile);
+  const outputPath = path.join(cwd, dir, outputName);
+
+  return {
+    basePath,
+    machinePath: '', // No machine-specific file exists
+    outputPath,
+    type,
+  };
 }
 
 /**

@@ -93,4 +93,32 @@ describe('CLI --yes flag', () => {
     // Should have merged successfully
     expect(stdout).toContain('Merged 1 file(s)');
   });
+
+  test('merge should create output from base file only when no machine-specific override exists', async () => {
+    // Create only a base file, no machine-specific override
+    const baseContent = { base: true, value: 42, name: 'test' };
+    await createTestFiles(repo, {
+      'config.base.json': JSON.stringify(baseContent, null, 2),
+    });
+
+    await repo.commit('Add base file only');
+
+    // Run merge
+    const { stdout } = await execAsync(`node "${cliPath}" merge`, { cwd: repo.path });
+
+    // Should have merged successfully
+    expect(stdout).toContain('Merged 1 file(s)');
+
+    // Should not show warning or prompt (file not tracked)
+    expect(stdout).not.toContain('Warning');
+    expect(stdout).not.toContain('(y/N)');
+
+    // Verify output file was created with same content as base
+    const output = await repo.readFile('config.json');
+    const parsed = JSON.parse(output);
+    expect(parsed).toEqual(baseContent);
+    expect(parsed.base).toBe(true);
+    expect(parsed.value).toBe(42);
+    expect(parsed.name).toBe('test');
+  });
 });

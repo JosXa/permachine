@@ -127,13 +127,16 @@ describe('file-filters integration', () => {
     expect(operations.some(op => op.outputPath.includes('new.json'))).toBe(true);
   });
 
-  test('ignores base files', async () => {
+  test('processes base-only files when no machine-specific file exists', async () => {
     await testRepo.writeFile('config.base.json', '{"shared": true}');
     await testRepo.writeFile('.env.base', 'SHARED=value');
 
     const operations = await scanForMergeOperations('homezone', testRepo.path);
 
-    expect(operations).toHaveLength(0);
+    // Should now find base-only files and create merge operations for them
+    expect(operations).toHaveLength(2);
+    expect(operations.some(op => op.outputPath.includes('config.json'))).toBe(true);
+    expect(operations.some(op => op.outputPath.includes('.env'))).toBe(true);
   });
 
   test('complex example: secrets per machine and user', async () => {

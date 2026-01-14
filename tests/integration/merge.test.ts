@@ -56,11 +56,20 @@ describe('merge integration', () => {
       'config.base.json': JSON.stringify({ y: 2 }, null, 2),
     });
 
-    // Manually create operation since scanner won't find machine file
+    // Scanner now finds base-only files
     const operations = await scanForMergeOperations(machineName, repo.path);
-    expect(operations.length).toBe(0);
-
-    // This test scenario doesn't apply - scanner only finds machine files
+    expect(operations.length).toBe(1);
+    expect(operations[0].basePath).toContain('config.base.json');
+    expect(operations[0].outputPath).toContain('config.json');
+    
+    // Perform the merge
+    const results = await performAllMerges(operations);
+    expect(results[0].success).toBe(true);
+    
+    // Verify output
+    const output = await repo.readFile('config.json');
+    const parsed = JSON.parse(output);
+    expect(parsed).toEqual({ y: 2 });
   });
 
   test('should skip when both files missing', async () => {
