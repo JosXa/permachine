@@ -18,6 +18,34 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check CI status before releasing
+        run: |
+          # Get the commit SHA that this tag points to
+          TAG_COMMIT=$(git rev-parse ${{ github.ref }})
+          echo "Tag points to commit: $TAG_COMMIT"
+          
+          # Wait a bit to allow CI to start if it hasn't yet
+          sleep 5
+          
+          # Check CI status using GitHub CLI
+          echo "Checking CI workflow status for commit $TAG_COMMIT..."
+          
+          # Get the most recent CI run for this commit
+          CI_STATUS=$(gh run list --commit $TAG_COMMIT --workflow=ci.yml --limit 1 --json conclusion --jq '.[0].conclusion')
+          
+          if [ "$CI_STATUS" != "success" ]; then
+            echo "❌ Error: CI workflow must pass before releasing!"
+            echo "Current CI status: $CI_STATUS"
+            echo ""
+            echo "Please ensure CI passes on this commit before creating a release tag."
+            echo "View runs at: https://github.com/${{ github.repository }}/actions/workflows/ci.yml"
+            exit 1
+          fi
+          
+          echo "✅ CI passed successfully"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
