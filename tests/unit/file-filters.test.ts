@@ -14,6 +14,7 @@ import {
   convertLegacyFilename,
   isLegacyFilename,
   parseAnyFormat,
+  isBaseFile,
   type Filter,
   type FilterContext,
 } from '../../src/core/file-filters.js';
@@ -536,5 +537,48 @@ describe('range matching', () => {
     const context = createCustomContext({ name: 'm' });
     
     expect(isMatch('file.{name^a-z}.json', context)).toBe(true);
+  });
+});
+
+describe('isBaseFile', () => {
+  test('detects legacy .base pattern (middle of filename)', () => {
+    expect(isBaseFile('config.base.json')).toBe(true);
+    expect(isBaseFile('file.base.md')).toBe(true);
+  });
+
+  test('detects legacy .base at end (dotfiles)', () => {
+    expect(isBaseFile('.env.base')).toBe(true);
+  });
+
+  test('detects new {base} placeholder syntax', () => {
+    expect(isBaseFile('file.{base}.json')).toBe(true);
+    expect(isBaseFile('config.{base}.md')).toBe(true);
+  });
+
+  test('detects {base} with filters', () => {
+    expect(isBaseFile('file.{base}.{os=windows}.json')).toBe(true);
+    expect(isBaseFile('config.{machine=laptop}.{base}.json')).toBe(true);
+  });
+
+  test('does not detect regular machine files as base', () => {
+    expect(isBaseFile('config.{os=windows}.json')).toBe(false);
+    expect(isBaseFile('file.{machine=laptop}.md')).toBe(false);
+    expect(isBaseFile('config.homezone.json')).toBe(false);
+  });
+
+  test('does not detect files that just happen to contain "base" as keyword', () => {
+    expect(isBaseFile('database.json')).toBe(false);
+    expect(isBaseFile('based.json')).toBe(false);
+    expect(isBaseFile('base.json')).toBe(false);
+  });
+
+  test('handles multiple extensions correctly', () => {
+    expect(isBaseFile('backup.base.tar.gz')).toBe(true);
+    expect(isBaseFile('backup.{base}.tar.gz')).toBe(true);
+  });
+
+  test('is case-insensitive for {base} placeholder', () => {
+    expect(isBaseFile('file.{BASE}.json')).toBe(true);
+    expect(isBaseFile('file.{Base}.json')).toBe(true);
   });
 });

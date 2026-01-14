@@ -9,6 +9,7 @@ import {
   convertLegacyFilename,
   createCustomContext,
   matchFilters,
+  isBaseFile,
 } from './file-filters.js';
 import { getMachineName } from './machine-detector.js';
 
@@ -69,16 +70,10 @@ export async function scanForMergeOperations(
 
   // Filter files that match current context
   for (const file of uniqueFiles) {
-    // Check if this file uses new filter syntax and matches current context
     const basename = path.basename(file);
     
-    // Skip base files (but not files that just happen to contain ".base" in the name)
-    // Check for .base. (middle of filename) or .base at end (no extension or after extension)
-    const isBaseFile = basename.includes('.base.') || 
-                       basename.endsWith('.base') || 
-                       basename.endsWith('.base.json') ||
-                       basename.endsWith('.base.md');
-    if (isBaseFile) {
+    // Skip base files (both legacy .base and new {base} syntax)
+    if (isBaseFile(basename)) {
       continue;
     }
     
