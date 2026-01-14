@@ -9,6 +9,7 @@ import {
   convertLegacyFilename,
   createCustomContext,
   matchFilters,
+  isBaseFile,
 } from './file-filters.js';
 import { getMachineName } from './machine-detector.js';
 
@@ -16,7 +17,7 @@ export interface MergeOperation {
   basePath: string | null;      // May not exist
   machinePath: string;           // Always exists (we found it)
   outputPath: string;
-  type: 'json' | 'env' | 'unknown';
+  type: 'json' | 'env' | 'md' | 'unknown';
 }
 
 /**
@@ -69,11 +70,10 @@ export async function scanForMergeOperations(
 
   // Filter files that match current context
   for (const file of uniqueFiles) {
-    // Check if this file uses new filter syntax and matches current context
     const basename = path.basename(file);
     
-    // Skip base files
-    if (basename.includes('.base.') || basename.includes('.base')) {
+    // Skip base files (both legacy .base and new {base} syntax)
+    if (isBaseFile(basename)) {
       continue;
     }
     
@@ -112,6 +112,7 @@ export async function scanForMergeOperations(
   // Also scan for base files that don't have a corresponding machine-specific file
   const basePatterns = [
     '**/*.base.json',
+    '**/*.base.md',
     '**/.*.base',
     '**/.*.base.*',
   ];
@@ -158,7 +159,7 @@ function createBaseOnlyMergeOperation(
   const fullBasename = path.basename(baseFile);
 
   // Determine file type
-  let type: 'json' | 'env' | 'unknown';
+  let type: 'json' | 'env' | 'md' | 'unknown';
   let ext: string;
   
   if (fullBasename.endsWith('.base.json')) {
@@ -167,6 +168,9 @@ function createBaseOnlyMergeOperation(
   } else if (fullBasename.startsWith('.') && fullBasename.includes('.base')) {
     type = 'env';
     ext = '';
+  } else if (fullBasename.endsWith('.base.md')) {
+    type = 'md';
+    ext = '.md';
   } else {
     type = 'unknown';
     ext = path.extname(baseFile);
@@ -213,7 +217,7 @@ function createMergeOperation(
   const fullBasename = path.basename(machineFile);
 
   // Determine file type by looking at the full filename pattern
-  let type: 'json' | 'env' | 'unknown';
+  let type: 'json' | 'env' | 'md' | 'unknown';
   let ext: string;
   
   if (fullBasename.endsWith('.json')) {
@@ -222,6 +226,9 @@ function createMergeOperation(
   } else if (fullBasename.startsWith('.env')) {
     type = 'env';
     ext = ''; // .env files don't have a traditional extension
+  } else if (fullBasename.endsWith('.md')) {
+    type = 'md';
+    ext = '.md';
   } else {
     type = 'unknown';
     ext = path.extname(machineFile);

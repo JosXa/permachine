@@ -179,4 +179,120 @@ describe('merge integration', () => {
     await performMerge(operations[0]);
     expect(await repo.fileExists('configs/app.json')).toBe(true);
   });
+
+  test('should merge markdown files by appending content', async () => {
+    const baseContent = '# README\n\nShared documentation.';
+    const machineContent = '## Local Setup\n\nRun locally.';
+
+    await createTestFiles(repo, {
+      'README.base.md': baseContent,
+      [`README.${machineName}.md`]: machineContent,
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    expect(operations.length).toBe(1);
+
+    const result = await performMerge(operations[0]);
+    expect(result.success).toBe(true);
+    expect(result.changed).toBe(true);
+
+    const output = await repo.readFile('README.md');
+    expect(output).toContain(baseContent);
+    expect(output).toContain(machineContent);
+    expect(output).toMatch(/Shared documentation\.\n\n## Local Setup/);
+  });
+
+  test('should use base markdown when machine missing', async () => {
+    const baseContent = '# README\n\nOnly base content.';
+
+    await createTestFiles(repo, {
+      'README.base.md': baseContent,
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    expect(operations.length).toBe(1);
+
+    const result = await performMerge(operations[0]);
+    expect(result.success).toBe(true);
+
+    const output = await repo.readFile('README.md');
+    expect(output).toContain(baseContent);
+  });
+
+  test('should use machine markdown when base missing', async () => {
+    const machineContent = '# README\n\nOnly machine content.';
+
+    await createTestFiles(repo, {
+      [`README.${machineName}.md`]: machineContent,
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    expect(operations.length).toBe(1);
+
+    const result = await performMerge(operations[0]);
+    expect(result.success).toBe(true);
+
+    const output = await repo.readFile('README.md');
+    expect(output).toContain(machineContent);
+  });
+
+  test('should handle markdown with new filter syntax', async () => {
+    const baseContent = '# README\n\nBase content.';
+    const machineContent = '## Machine Specific\n\nLocal config.';
+
+    await createTestFiles(repo, {
+      'README.base.md': baseContent,
+      [`README.{machine=${machineName}}.md`]: machineContent,
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    expect(operations.length).toBe(1);
+
+    const result = await performMerge(operations[0]);
+    expect(result.success).toBe(true);
+
+    const output = await repo.readFile('README.md');
+    expect(output).toContain(baseContent);
+    expect(output).toContain(machineContent);
+  });
+
+  test('should handle markdown with complex formatting', async () => {
+    const baseContent = `# Project Documentation
+
+## Features
+- Feature 1
+- Feature 2
+
+\`\`\`js
+const code = true;
+\`\`\`
+`;
+
+    const machineContent = `## Local Setup
+
+\`\`\`bash
+npm install
+npm run dev
+\`\`\`
+
+## Notes
+- Local development notes
+`;
+
+    await createTestFiles(repo, {
+      'README.base.md': baseContent,
+      [`README.${machineName}.md`]: machineContent,
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    await performMerge(operations[0]);
+
+    const output = await repo.readFile('README.md');
+    expect(output).toContain('# Project Documentation');
+    expect(output).toContain('- Feature 1\n- Feature 2');
+    expect(output).toContain('const code = true');
+    expect(output).toContain('## Local Setup');
+    expect(output).toContain('npm install');
+    expect(output).toContain('Local development notes');
+  });
 });

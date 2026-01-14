@@ -457,3 +457,25 @@ export function parseAnyFormat(filename: string, machineName?: string): ParseRes
   
   return parseFilters(filename);
 }
+
+/**
+ * Check if a filename represents a base file
+ * 
+ * Base files can be:
+ * - Legacy: config.base.json, .env.base
+ * - New: file.{base}.json, file.{base}.{os=windows}.json
+ * 
+ * @param filename - The filename to check
+ * @returns true if the filename represents a base file
+ */
+export function isBaseFile(filename: string): boolean {
+  // Check for legacy .base pattern (e.g., config.base.json, .env.base)
+  const hasLegacyBase = filename.includes('.base.') || 
+                        filename.endsWith('.base');
+  
+  // Check for new {base} placeholder syntax (e.g., file.{base}.json)
+  const parseResult = parseFilters(filename);
+  const hasNewBase = parseResult.hasBasePlaceholder;
+  
+  return hasLegacyBase || hasNewBase;
+}

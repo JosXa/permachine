@@ -2,10 +2,12 @@ import path from 'node:path';
 import type { FileAdapter } from './base.js';
 import { JsonAdapter } from './json-adapter.js';
 import { EnvAdapter } from './env-adapter.js';
+import { MarkdownAdapter } from './markdown-adapter.js';
 
 const adapters: FileAdapter[] = [
   new JsonAdapter(),
   new EnvAdapter(),
+  new MarkdownAdapter(),
 ];
 
 /**
