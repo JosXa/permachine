@@ -5,6 +5,7 @@ import { getMachineName } from './core/machine-detector.js';
 import { scanForMergeOperations } from './core/file-scanner.js';
 import { performAllMerges } from './core/merger.js';
 import { manageGitignore, isFileTrackedByGit } from './core/gitignore-manager.js';
+import { installHooks, uninstallHooks } from './core/git-hooks.js';
 import { startWatcher } from './core/watcher.js';
 import { logger } from './utils/logger.js';
 import fs from 'node:fs/promises';
