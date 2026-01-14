@@ -404,6 +404,29 @@ export function getBaseFilename(filename: string): string {
 }
 
 /**
+ * Check if a filename is a base file (contains literal .base. or ends with .base)
+ * 
+ * Note: Files with {base} placeholder like config.{base}.json are NOT base files -
+ * they are machine-specific files that reference the base filename during expansion.
+ * 
+ * Examples:
+ *   isBaseFile('config.base.json') -> true (this IS a base file)
+ *   isBaseFile('.env.base') -> true (this IS a base file)
+ *   isBaseFile('file.{base}.json') -> false (this is a MACHINE-SPECIFIC file with placeholder)
+ *   isBaseFile('config.{os=windows}.json') -> false
+ *   isBaseFile('config.json') -> false
+ */
+export function isBaseFile(filename: string): boolean {
+  const basename = filename.includes('/') || filename.includes('\\')
+    ? filename.split(/[/\\]/).pop() || filename
+    : filename;
+  
+  // Check for literal .base. or .base suffix only
+  // Do NOT check for {base} placeholder - those are machine-specific files
+  return basename.includes('.base.') || basename.endsWith('.base');
+}
+
+/**
  * Given a base filename, check if a machine-specific version exists that matches current context
  * This is useful for discovering which machine-specific files apply to this machine
  */

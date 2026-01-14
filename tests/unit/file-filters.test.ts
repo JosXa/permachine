@@ -14,6 +14,7 @@ import {
   convertLegacyFilename,
   isLegacyFilename,
   parseAnyFormat,
+  isBaseFile,
   type Filter,
   type FilterContext,
 } from '../../src/core/file-filters.js';
@@ -536,5 +537,178 @@ describe('range matching', () => {
     const context = createCustomContext({ name: 'm' });
     
     expect(isMatch('file.{name^a-z}.json', context)).toBe(true);
+  });
+});
+
+describe('isBaseFile', () => {
+  describe('literal .base. files', () => {
+    test('detects config.base.json as base file', () => {
+      expect(isBaseFile('config.base.json')).toBe(true);
+    });
+
+    test('detects .env.base as base file', () => {
+      expect(isBaseFile('.env.base')).toBe(true);
+    });
+
+    test('detects app.base.config.json as base file', () => {
+      expect(isBaseFile('app.base.config.json')).toBe(true);
+    });
+
+    test('detects secrets.base.env as base file', () => {
+      expect(isBaseFile('secrets.base.env')).toBe(true);
+    });
+
+    test('detects .gitignore.base as base file', () => {
+      expect(isBaseFile('.gitignore.base')).toBe(true);
+    });
+  });
+
+  describe('{base} placeholder files', () => {
+    test('does NOT detect file.{base}.json as base file (it is a machine-specific file)', () => {
+      expect(isBaseFile('file.{base}.json')).toBe(false);
+    });
+
+    test('does NOT detect config.{base}.env as base file (it is a machine-specific file)', () => {
+      expect(isBaseFile('config.{base}.env')).toBe(false);
+    });
+
+    test('does NOT detect .env.{base} as base file (it is a machine-specific file)', () => {
+      expect(isBaseFile('.env.{base}')).toBe(false);
+    });
+
+    test('does NOT detect app.{base}.config.json as base file (it is a machine-specific file)', () => {
+      expect(isBaseFile('app.{base}.config.json')).toBe(false);
+    });
+
+    test('{base} placeholder files are never base files (case-insensitive)', () => {
+      expect(isBaseFile('file.{BASE}.json')).toBe(false);
+      expect(isBaseFile('file.{Base}.json')).toBe(false);
+      expect(isBaseFile('file.{BaSe}.json')).toBe(false);
+    });
+  });
+
+  describe('files with paths', () => {
+    test('detects base file with relative path', () => {
+      expect(isBaseFile('src/config.base.json')).toBe(true);
+    });
+
+    test('does NOT detect {base} file with relative path (machine-specific)', () => {
+      expect(isBaseFile('src/config.{base}.json')).toBe(false);
+    });
+
+    test('detects base file with absolute Unix path', () => {
+      expect(isBaseFile('/absolute/path/.env.base')).toBe(true);
+    });
+
+    test('does NOT detect {base} file with absolute Unix path (machine-specific)', () => {
+      expect(isBaseFile('/absolute/path/.env.{base}')).toBe(false);
+    });
+
+    test('detects base file with absolute Windows path', () => {
+      expect(isBaseFile('C:\\Users\\test\\config.base.json')).toBe(true);
+    });
+
+    test('does NOT detect {base} file with absolute Windows path (machine-specific)', () => {
+      expect(isBaseFile('C:\\Users\\test\\config.{base}.json')).toBe(false);
+    });
+
+    test('detects base file with nested paths', () => {
+      expect(isBaseFile('src/configs/app/settings.base.json')).toBe(true);
+    });
+
+    test('does NOT detect {base} file with nested paths (machine-specific)', () => {
+      expect(isBaseFile('src/configs/app/settings.{base}.json')).toBe(false);
+    });
+  });
+
+  describe('non-base files', () => {
+    test('does not detect config.json as base file', () => {
+      expect(isBaseFile('config.json')).toBe(false);
+    });
+
+    test('does not detect .env as base file', () => {
+      expect(isBaseFile('.env')).toBe(false);
+    });
+
+    test('does not detect config.{os=windows}.json as base file', () => {
+      expect(isBaseFile('config.{os=windows}.json')).toBe(false);
+    });
+
+    test('does not detect app.{machine=laptop}.env as base file', () => {
+      expect(isBaseFile('app.{machine=laptop}.env')).toBe(false);
+    });
+
+    test('does not detect settings.json as base file', () => {
+      expect(isBaseFile('settings.json')).toBe(false);
+    });
+
+    test('does not detect .gitignore as base file', () => {
+      expect(isBaseFile('.gitignore')).toBe(false);
+    });
+  });
+
+  describe('edge cases', () => {
+    test('detects .base as base file (just the filename)', () => {
+      expect(isBaseFile('.base')).toBe(true);
+    });
+
+    test('does not detect base.json as base file (no dot before base)', () => {
+      expect(isBaseFile('base.json')).toBe(false);
+    });
+
+    test('does not detect database.json as base file (base is substring)', () => {
+      expect(isBaseFile('database.json')).toBe(false);
+    });
+
+    test('does not detect rebase.config.json as base file (base is substring)', () => {
+      expect(isBaseFile('rebase.config.json')).toBe(false);
+    });
+
+    test('detects file with both .base. and other filters', () => {
+      // This shouldn't normally happen, but if it does, it's still a base file
+      expect(isBaseFile('config.base.{os=windows}.json')).toBe(true);
+    });
+
+    test('does NOT detect file with {base} and other filters (machine-specific)', () => {
+      expect(isBaseFile('config.{os=windows}.{base}.json')).toBe(false);
+    });
+
+    test('handles empty string', () => {
+      expect(isBaseFile('')).toBe(false);
+    });
+
+    test('handles file with multiple .base. occurrences', () => {
+      expect(isBaseFile('config.base.base.json')).toBe(true);
+    });
+
+    test('handles file with .base at the end', () => {
+      expect(isBaseFile('config.base')).toBe(true);
+    });
+  });
+
+  describe('mixed formats', () => {
+    test('detects base file with multiple extensions', () => {
+      expect(isBaseFile('backup.base.tar.gz')).toBe(true);
+    });
+
+    test('does NOT detect {base} file with multiple extensions (machine-specific)', () => {
+      expect(isBaseFile('backup.{base}.tar.gz')).toBe(false);
+    });
+
+    test('detects base file with hyphens and underscores', () => {
+      expect(isBaseFile('app-config.base.json')).toBe(true);
+    });
+
+    test('does NOT detect {base} file with hyphens/underscores (machine-specific)', () => {
+      expect(isBaseFile('app_config.{base}.json')).toBe(false);
+    });
+
+    test('detects base file with numbers', () => {
+      expect(isBaseFile('config-v2.base.json')).toBe(true);
+    });
+
+    test('does NOT detect {base} file with numbers (machine-specific)', () => {
+      expect(isBaseFile('config-v2.{base}.json')).toBe(false);
+    });
   });
 });

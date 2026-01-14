@@ -9,6 +9,7 @@ import {
   convertLegacyFilename,
   createCustomContext,
   matchFilters,
+  isBaseFile,
 } from './file-filters.js';
 import { getMachineName } from './machine-detector.js';
 
@@ -73,7 +74,7 @@ export async function scanForMergeOperations(
     const basename = path.basename(file);
     
     // Skip base files
-    if (basename.includes('.base.') || basename.includes('.base')) {
+    if (isBaseFile(basename)) {
       continue;
     }
     
@@ -161,10 +162,11 @@ function createBaseOnlyMergeOperation(
   let type: 'json' | 'env' | 'unknown';
   let ext: string;
   
-  if (fullBasename.endsWith('.base.json')) {
+  // Check file type based on extension and naming patterns
+  if (fullBasename.endsWith('.json') || fullBasename.includes('.base.json') || fullBasename.includes('.{base}.json')) {
     type = 'json';
     ext = '.json';
-  } else if (fullBasename.startsWith('.') && fullBasename.includes('.base')) {
+  } else if (fullBasename.startsWith('.env')) {
     type = 'env';
     ext = '';
   } else {
@@ -182,10 +184,12 @@ function createBaseOnlyMergeOperation(
   
   if (type === 'env') {
     // .env.base -> .env
-    outputName = fullBasename.replace('.base', '');
+    // .env.{base} -> .env
+    outputName = fullBasename.replace('.base', '').replace('.{base}', '');
   } else {
     // config.base.json -> config.json
-    outputName = fullBasename.replace('.base', '');
+    // config.{base}.json -> config.json
+    outputName = fullBasename.replace('.base', '').replace('.{base}', '');
   }
 
   // Construct full paths
