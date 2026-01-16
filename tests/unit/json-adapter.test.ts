@@ -9,6 +9,10 @@ describe('JsonAdapter', () => {
       expect(adapter.canHandle('.json')).toBe(true);
     });
 
+    test('should handle .jsonc extension', () => {
+      expect(adapter.canHandle('.jsonc')).toBe(true);
+    });
+
     test('should not handle other extensions', () => {
       expect(adapter.canHandle('.env')).toBe(false);
       expect(adapter.canHandle('.txt')).toBe(false);
@@ -36,6 +40,26 @@ describe('JsonAdapter', () => {
       const json = '{"items": [1, 2, 3]}';
       const result = adapter.parse(json);
       expect(result).toEqual({ items: [1, 2, 3] });
+    });
+
+    test('should parse JSONC with comments', () => {
+      const jsonc = `{
+        // This is a comment
+        "key": "value",
+        /* Block comment */
+        "number": 42
+      }`;
+      const result = adapter.parse(jsonc);
+      expect(result).toEqual({ key: 'value', number: 42 });
+    });
+
+    test('should parse JSONC with trailing commas', () => {
+      const jsonc = `{
+        "key": "value",
+        "items": [1, 2, 3,],
+      }`;
+      const result = adapter.parse(jsonc);
+      expect(result).toEqual({ key: 'value', items: [1, 2, 3] });
     });
   });
 

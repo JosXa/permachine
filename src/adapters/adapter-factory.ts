@@ -30,3 +30,25 @@ export function getAdapter(filePath: string): FileAdapter | null {
 
   return null;
 }
+
+/**
+ * Determine the file type from a filename or path
+ * Returns the type that corresponds to an adapter
+ */
+export function getFileType(filename: string): 'json' | 'env' | 'unknown' {
+  const basename = path.basename(filename);
+  
+  // Check if .env file
+  if (basename.startsWith('.env')) {
+    return 'env';
+  }
+  
+  const ext = path.extname(filename);
+  
+  // Check if JSON/JSONC file
+  if (ext === '.json' || ext === '.jsonc') {
+    return 'json';
+  }
+  
+  return 'unknown';
+}

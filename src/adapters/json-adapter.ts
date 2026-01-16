@@ -3,7 +3,7 @@ import stripJsonComments from 'strip-json-comments';
 
 export class JsonAdapter implements FileAdapter {
   canHandle(extension: string): boolean {
-    return extension === '.json';
+    return extension === '.json' || extension === '.jsonc';
   }
 
   parse(content: string): any {

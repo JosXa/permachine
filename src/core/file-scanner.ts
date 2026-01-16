@@ -12,6 +12,7 @@ import {
   isBaseFile,
 } from './file-filters.js';
 import { getMachineName } from './machine-detector.js';
+import { getFileType } from '../adapters/adapter-factory.js';
 
 export interface MergeOperation {
   basePath: string | null;      // May not exist
@@ -113,6 +114,7 @@ export async function scanForMergeOperations(
   // Also scan for base files that don't have a corresponding machine-specific file
   const basePatterns = [
     '**/*.base.json',
+    '**/*.base.jsonc',
     '**/.*.base',
     '**/.*.base.*',
   ];
@@ -158,21 +160,8 @@ function createBaseOnlyMergeOperation(
   const dir = path.dirname(baseFile);
   const fullBasename = path.basename(baseFile);
 
-  // Determine file type
-  let type: 'json' | 'env' | 'unknown';
-  let ext: string;
-  
-  // Check file type based on extension and naming patterns
-  if (fullBasename.endsWith('.json') || fullBasename.includes('.base.json') || fullBasename.includes('.{base}.json')) {
-    type = 'json';
-    ext = '.json';
-  } else if (fullBasename.startsWith('.env')) {
-    type = 'env';
-    ext = '';
-  } else {
-    type = 'unknown';
-    ext = path.extname(baseFile);
-  }
+  // Determine file type using centralized logic
+  const type = getFileType(fullBasename);
 
   // Only handle supported types
   if (type === 'unknown') {
@@ -188,7 +177,7 @@ function createBaseOnlyMergeOperation(
     outputName = fullBasename.replace('.base', '').replace('.{base}', '');
   } else {
     // config.base.json -> config.json
-    // config.{base}.json -> config.json
+    // config.{base}.jsonc -> config.jsonc
     outputName = fullBasename.replace('.base', '').replace('.{base}', '');
   }
 
@@ -216,20 +205,9 @@ function createMergeOperation(
   const dir = path.dirname(machineFile);
   const fullBasename = path.basename(machineFile);
 
-  // Determine file type by looking at the full filename pattern
-  let type: 'json' | 'env' | 'unknown';
-  let ext: string;
-  
-  if (fullBasename.endsWith('.json')) {
-    type = 'json';
-    ext = '.json';
-  } else if (fullBasename.startsWith('.env')) {
-    type = 'env';
-    ext = ''; // .env files don't have a traditional extension
-  } else {
-    type = 'unknown';
-    ext = path.extname(machineFile);
-  }
+  // Determine file type using centralized logic
+  const type = getFileType(fullBasename);
+  const ext = path.extname(machineFile);
 
   // Only handle supported types
   if (type === 'unknown') {
