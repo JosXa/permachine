@@ -179,4 +179,38 @@ describe('merge integration', () => {
     await performMerge(operations[0]);
     expect(await repo.fileExists('configs/app.json')).toBe(true);
   });
+
+  test('should merge JSONC files and output JSON', async () => {
+    const basejsonc = `{
+      // Base configuration
+      "port": 3000,
+      "host": "localhost"
+    }`;
+    
+    const machineJsonc = `{
+      // Machine override
+      "port": 8080,
+    }`;
+    
+    await createTestFiles(repo, {
+      'config.base.jsonc': basejsonc,
+      [`config.{machine=${machineName}}.jsonc`]: machineJsonc,
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    expect(operations.length).toBe(1);
+    expect(operations[0].outputPath).toContain('config.json'); // Should output .json, not .jsonc
+
+    const result = await performMerge(operations[0]);
+    expect(result.success).toBe(true);
+    expect(result.changed).toBe(true);
+
+    const output = await repo.readFile('config.json');
+    const parsed = JSON.parse(output);
+    expect(parsed).toEqual({ port: 8080, host: 'localhost' });
+    
+    // Verify it's clean JSON without comments
+    expect(output).not.toContain('//');
+    expect(output).not.toContain('Base configuration');
+  });
 });

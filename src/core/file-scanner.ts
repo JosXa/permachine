@@ -177,8 +177,12 @@ function createBaseOnlyMergeOperation(
     outputName = fullBasename.replace('.base', '').replace('.{base}', '');
   } else {
     // config.base.json -> config.json
-    // config.{base}.jsonc -> config.jsonc
+    // config.base.jsonc -> config.json (always output .json, not .jsonc)
     outputName = fullBasename.replace('.base', '').replace('.{base}', '');
+    // Normalize .jsonc to .json for output
+    if (outputName.endsWith('.jsonc')) {
+      outputName = outputName.replace(/\.jsonc$/, '.json');
+    }
   }
 
   // Construct full paths
@@ -220,7 +224,13 @@ function createMergeOperation(
 
   if (hasFilters(fullBasename)) {
     // New syntax: config.{os=windows}.json -> config.json
+    // New syntax: config.{os=windows}.jsonc -> config.json
     outputName = getBaseFilename(fullBasename);
+    
+    // Normalize .jsonc to .json for output
+    if (type === 'json' && outputName.endsWith('.jsonc')) {
+      outputName = outputName.replace(/\.jsonc$/, '.json');
+    }
     
     // For new syntax, the base file is the output name with .base inserted before extension
     if (type === 'env') {
@@ -229,7 +239,8 @@ function createMergeOperation(
       baseName = nameWithoutExt + '.base';
     } else {
       // config.json -> config.base.json
-      const nameWithoutExt = outputName.replace(ext, '');
+      // config.jsonc -> config.base.jsonc (base keeps .jsonc, output is .json)
+      const nameWithoutExt = outputName.replace(/\.(json|jsonc)$/, '');
       baseName = nameWithoutExt + '.base' + ext;
     }
   } else {
@@ -246,7 +257,9 @@ function createMergeOperation(
       // Add extension back for non-env files
       if (type !== 'env') {
         baseName = baseName + ext;
-        outputName = outputName + ext;
+        // Normalize .jsonc to .json for output
+        const outputExt = ext === '.jsonc' ? '.json' : ext;
+        outputName = outputName + outputExt;
       }
     } else {
       // Shouldn't happen if filtering is correct
