@@ -180,6 +180,83 @@ describe('merge integration', () => {
     expect(await repo.fileExists('configs/app.json')).toBe(true);
   });
 
+  test('should merge primitive arrays with deduplication', async () => {
+    const base = {
+      plugins: ['plugin-a', 'plugin-b'],
+      ports: [3000, 3001],
+    };
+    const machine = {
+      plugins: ['plugin-c', 'plugin-a'], // 'plugin-a' is duplicate
+      ports: [3002],
+    };
+
+    await createTestFiles(repo, {
+      'config.base.json': JSON.stringify(base, null, 2),
+      [`config.${machineName}.json`]: JSON.stringify(machine, null, 2),
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    await performMerge(operations[0]);
+
+    const output = await repo.readFile('config.json');
+    const parsed = JSON.parse(output);
+
+    expect(parsed).toEqual({
+      plugins: ['plugin-a', 'plugin-b', 'plugin-c'], // Merged, deduped, base order preserved
+      ports: [3000, 3001, 3002],
+    });
+  });
+
+  test('should merge nested object arrays', async () => {
+    const base = {
+      config: {
+        mcp: { servers: ['server-a', 'server-b'] },
+      },
+    };
+    const machine = {
+      config: {
+        mcp: { servers: ['server-c', 'server-a'] },
+      },
+    };
+
+    await createTestFiles(repo, {
+      'settings.base.json': JSON.stringify(base, null, 2),
+      [`settings.${machineName}.json`]: JSON.stringify(machine, null, 2),
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    await performMerge(operations[0]);
+
+    const output = await repo.readFile('settings.json');
+    const parsed = JSON.parse(output);
+
+    expect(parsed).toEqual({
+      config: {
+        mcp: { servers: ['server-a', 'server-b', 'server-c'] },
+      },
+    });
+  });
+
+  test('should error when merging arrays with non-primitive values', async () => {
+    const base = {
+      items: [{ name: 'a' }],
+    };
+    const machine = {
+      items: [{ name: 'b' }],
+    };
+
+    await createTestFiles(repo, {
+      'config.base.json': JSON.stringify(base, null, 2),
+      [`config.${machineName}.json`]: JSON.stringify(machine, null, 2),
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    const result = await performMerge(operations[0]);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Cannot merge arrays containing non-primitive values');
+  });
+
   test('should merge JSONC files and output JSON', async () => {
     const basejsonc = `{
       // Base configuration

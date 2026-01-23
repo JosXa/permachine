@@ -87,11 +87,102 @@ describe('JsonAdapter', () => {
       });
     });
 
-    test('should replace arrays entirely', () => {
-      const base = { items: [1, 2, 3] };
-      const machine = { items: [4, 5] };
+    test('should merge arrays of primitive strings with deduplication', () => {
+      const base = { plugins: ['a', 'b', 'c'] };
+      const machine = { plugins: ['c', 'd'] };
       const result = adapter.merge(base, machine);
-      expect(result).toEqual({ items: [4, 5] });
+      expect(result).toEqual({ plugins: ['a', 'b', 'c', 'd'] });
+    });
+
+    test('should merge arrays of primitive numbers with deduplication', () => {
+      const base = { ports: [3000, 3001, 3002] };
+      const machine = { ports: [3002, 8080] };
+      const result = adapter.merge(base, machine);
+      expect(result).toEqual({ ports: [3000, 3001, 3002, 8080] });
+    });
+
+    test('should merge arrays of mixed primitives with deduplication', () => {
+      const base = { values: [1, 'a', true] };
+      const machine = { values: ['a', false, 2] };
+      const result = adapter.merge(base, machine);
+      expect(result).toEqual({ values: [1, 'a', true, false, 2] });
+    });
+
+    test('should preserve base array order when merging', () => {
+      const base = { items: ['first', 'second'] };
+      const machine = { items: ['third', 'first'] }; // 'first' is duplicate
+      const result = adapter.merge(base, machine);
+      expect(result).toEqual({ items: ['first', 'second', 'third'] });
+    });
+
+    test('should merge empty base array with machine array', () => {
+      const base = { plugins: [] };
+      const machine = { plugins: ['a', 'b'] };
+      const result = adapter.merge(base, machine);
+      expect(result).toEqual({ plugins: ['a', 'b'] });
+    });
+
+    test('should merge base array with empty machine array', () => {
+      const base = { plugins: ['a', 'b'] };
+      const machine = { plugins: [] };
+      const result = adapter.merge(base, machine);
+      expect(result).toEqual({ plugins: ['a', 'b'] });
+    });
+
+    test('should throw error when base array contains objects', () => {
+      const base = { items: [{ a: 1 }, { b: 2 }] };
+      const machine = { items: [{ c: 3 }] };
+      expect(() => adapter.merge(base, machine)).toThrow('Cannot merge arrays containing non-primitive values');
+    });
+
+    test('should throw error when machine array contains objects', () => {
+      const base = { items: ['a', 'b'] };
+      const machine = { items: [{ c: 3 }] };
+      expect(() => adapter.merge(base, machine)).toThrow('Cannot merge arrays containing non-primitive values');
+    });
+
+    test('should throw error when base array contains nested arrays', () => {
+      const base = { items: [[1, 2], [3, 4]] };
+      const machine = { items: [[5, 6]] };
+      expect(() => adapter.merge(base, machine)).toThrow('Cannot merge arrays containing non-primitive values');
+    });
+
+    test('should throw error when machine array contains nested arrays', () => {
+      const base = { items: ['a'] };
+      const machine = { items: [['nested']] };
+      expect(() => adapter.merge(base, machine)).toThrow('Cannot merge arrays containing non-primitive values');
+    });
+
+    test('should throw error for mixed primitive and object arrays', () => {
+      const base = { items: ['a', 'b'] };
+      const machine = { items: ['c', { d: 1 }] };
+      expect(() => adapter.merge(base, machine)).toThrow('Cannot merge arrays containing non-primitive values');
+    });
+
+    test('should handle null values in primitive arrays', () => {
+      const base = { items: ['a', null, 'b'] };
+      const machine = { items: ['c', null] };
+      const result = adapter.merge(base, machine);
+      expect(result).toEqual({ items: ['a', null, 'b', 'c'] });
+    });
+
+    test('should merge nested object arrays correctly', () => {
+      const base = {
+        config: {
+          plugins: ['plugin-a', 'plugin-b'],
+        },
+      };
+      const machine = {
+        config: {
+          plugins: ['plugin-c', 'plugin-a'],
+        },
+      };
+      const result = adapter.merge(base, machine);
+      expect(result).toEqual({
+        config: {
+          plugins: ['plugin-a', 'plugin-b', 'plugin-c'],
+        },
+      });
     });
 
     test('should handle null values', () => {

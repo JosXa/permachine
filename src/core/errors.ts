@@ -141,3 +141,23 @@ export class CleanupError extends PermachineError {
     this.cause = cause;
   }
 }
+
+/**
+ * Error thrown when trying to merge arrays containing non-primitive values
+ * 
+ * Array merging only supports primitive values (string, number, boolean, null).
+ * Arrays containing objects or nested arrays cannot be merged.
+ */
+export class ArrayMergeError extends PermachineError {
+  readonly key: string;
+
+  constructor(key: string) {
+    super(
+      `Cannot merge arrays containing non-primitive values at key "${key}".\n` +
+      `Array merging only supports primitive values (string, number, boolean, null).\n` +
+      `Arrays containing objects or nested arrays cannot be merged.`
+    );
+    this.name = 'ArrayMergeError';
+    this.key = key;
+  }
+}
