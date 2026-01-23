@@ -207,6 +207,40 @@ describe('watcher integration', () => {
     }
   });
 
+  test('should perform initial merge before watching', async () => {
+    // Create files that need merging
+    await createTestFiles(repo, {
+      'config.base.json': JSON.stringify({ a: 1, b: 2 }, null, 2),
+      [`config.${machineName}.json`]: JSON.stringify({ b: 3, c: 4 }, null, 2),
+    });
+
+    // Output file should NOT exist yet
+    const existsBefore = await repo.fileExists('config.json');
+    expect(existsBefore).toBe(false);
+
+    // Start watcher - should perform initial merge
+    const stopWatcher = await startWatcher(machineName, {
+      debounce: 100,
+      cwd: repo.path,
+    });
+
+    try {
+      // Wait briefly for initial merge to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Output file SHOULD exist now (initial merge happened)
+      const existsAfter = await repo.fileExists('config.json');
+      expect(existsAfter).toBe(true);
+
+      // Verify the content is correct
+      const output = await repo.readFile('config.json');
+      const parsed = JSON.parse(output);
+      expect(parsed).toEqual({ a: 1, b: 3, c: 4 });
+    } finally {
+      await stopWatcher();
+    }
+  });
+
   test('should detect changes to existing watched files', async () => {
     await createTestFiles(repo, {
       'config.base.json': JSON.stringify({ a: 1 }, null, 2),

@@ -2,8 +2,8 @@ import chokidar from 'chokidar';
 import path from 'node:path';
 import type { MergeOperation, DirectoryCopyOperation } from './file-scanner.js';
 import { scanForMergeOperations, scanAllOperations, getFilteredDirectoryPaths } from './file-scanner.js';
-import { performMerge } from './merger.js';
-import { performDirectoryCopy } from './directory-copier.js';
+import { performMerge, performAllMerges } from './merger.js';
+import { performDirectoryCopy, performAllDirectoryCopies } from './directory-copier.js';
 import { logger } from '../utils/logger.js';
 
 export interface WatchOptions {
@@ -205,6 +205,23 @@ export async function startWatcher(
     logger.info('3. Or create machine-specific directories (e.g., mydir.{machine=' + machineName + '}/)');
     logger.info('4. Run: permachine watch');
     return () => {};
+  }
+  
+  // Perform initial merge before starting to watch
+  if (mergeOperations.length > 0) {
+    const mergeResults = await performAllMerges(mergeOperations);
+    const changedFiles = mergeResults.filter(r => r.changed).length;
+    if (changedFiles > 0 && !logger.isSilent()) {
+      console.log(`[${formatTime()}] Initial merge: ${changedFiles} file(s) updated`);
+    }
+  }
+  
+  if (directoryOperations.length > 0) {
+    const dirResults = await performAllDirectoryCopies(directoryOperations);
+    const changedDirs = dirResults.filter(r => r.changed).length;
+    if (changedDirs > 0 && !logger.isSilent()) {
+      console.log(`[${formatTime()}] Initial copy: ${changedDirs} directory(ies) updated`);
+    }
   }
   
   // Build state

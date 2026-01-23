@@ -10,6 +10,7 @@ alwaysApply: true
 - `bun remove <package>` not `npm uninstall <package>`
 - `bun run <script>` not `npm run <script>`
 - `bun test` not `npm test`
+- Global install: `bun install -g permachine`
 
 # Release Process
 
