@@ -480,3 +480,75 @@ export function parseAnyFormat(filename: string, machineName?: string): ParseRes
   
   return parseFilters(filename);
 }
+
+// ============================================================================
+// Directory Filter Functions
+// ============================================================================
+
+/**
+ * Check if a directory name contains filter syntax
+ * This is used to identify machine-specific directories like "jira.{machine=homezone}"
+ * 
+ * Example:
+ *   isFilteredDirectory('jira.{machine=homezone}') -> true
+ *   isFilteredDirectory('config.{os=windows}') -> true
+ *   isFilteredDirectory('regular-dir') -> false
+ *   isFilteredDirectory('jira.base') -> false
+ */
+export function isFilteredDirectory(dirname: string): boolean {
+  return hasFilters(dirname);
+}
+
+/**
+ * Match directory name filters against a context
+ * Returns match result with details
+ * 
+ * Example:
+ *   matchDirectoryFilters('jira.{machine=homezone}', { machine: 'homezone' }) 
+ *   -> { matches: true, ... }
+ */
+export function matchDirectoryFilters(
+  dirname: string,
+  context?: FilterContext
+): MatchResult {
+  return matchFilters(dirname, context);
+}
+
+/**
+ * Get the base directory name from a filtered directory name
+ * Removes all filter syntax to get the output directory name
+ * 
+ * Example:
+ *   getBaseDirectoryName('jira.{machine=homezone}') -> 'jira'
+ *   getBaseDirectoryName('config.{os=windows}{arch=x64}') -> 'config'
+ *   getBaseDirectoryName('regular-dir') -> 'regular-dir'
+ */
+export function getBaseDirectoryName(dirname: string): string {
+  // Get the base name using standard parsing
+  let baseName = getBaseFilename(dirname);
+  
+  // For directories, only strip leading dot if the original dirname started with a filter
+  // e.g., {machine=work}.settings -> .settings -> settings
+  // but .config.{machine=laptop} -> .config -> .config (keep the dot for hidden dirs)
+  if (dirname.startsWith('{') && baseName.startsWith('.')) {
+    baseName = baseName.replace(/^\./, '');
+  }
+  
+  return baseName;
+}
+
+/**
+ * Check if a directory name is a base directory pattern (e.g., "jira.base")
+ * Base directories are NOT supported for directory matching.
+ * 
+ * Example:
+ *   isBaseDirectory('jira.base') -> true
+ *   isBaseDirectory('config.base') -> true
+ *   isBaseDirectory('jira.{machine=homezone}') -> false
+ *   isBaseDirectory('regular-dir') -> false
+ */
+export function isBaseDirectory(dirname: string): boolean {
+  // Check for .base suffix (no extension for directories)
+  // Also check for {base} placeholder pattern
+  return dirname.endsWith('.base') || dirname.includes('{base}');
+}

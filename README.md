@@ -119,6 +119,48 @@ Same pattern works for `.env` files:
 | Machine-specific | `.env.{machine=laptop}`    | ✅ Yes             |
 | Final output     | `.env`                     | ❌ No (gitignored) |
 
+### Directory Matching (NEW)
+
+In addition to file-level merging, you can apply filters to **entire directories**. When a directory matches, all its contents are copied as-is to the output directory (without further filter processing or merging).
+
+**Example:**
+
+```bash
+.opencode/skills/
+├── jira.{machine=homezone}/       # Only exists on machine "homezone"
+│   ├── skill.md
+│   └── templates/
+│       └── issue.md
+├── work-tools.{machine=laptop}/   # Only exists on machine "laptop"  
+│   └── slack.md
+└── shared-skill/                  # Regular directory (always present)
+    └── common.md
+```
+
+**On machine `homezone`:**
+```bash
+.opencode/skills/
+├── jira/                          # ← Copied from jira.{machine=homezone}/
+│   ├── skill.md
+│   └── templates/
+│       └── issue.md
+└── shared-skill/
+    └── common.md
+```
+
+**Supported filters on directories:**
+- `{machine=hostname}` - Machine-specific directories
+- `{os=windows}`, `{os=macos}`, `{os=linux}` - OS-specific directories
+- `{user=username}` - User-specific directories
+- Multiple filters: `mydir.{machine=laptop}{os=windows}/` (AND logic)
+
+**Key behaviors:**
+- Files inside matched directories are copied verbatim (no recursive filter processing)
+- No base directory fallback (unlike files, there's no `mydir.base/` pattern)
+- Nested filtered directories are not allowed: `outer.{machine=X}/inner.{os=Y}/` → Error
+- If multiple directories would produce the same output, an error is raised
+- Stale outputs are renamed with `.permachine-deleted` suffix for safety
+
 ### Basic Commands
 
 #### Initialize in Repository

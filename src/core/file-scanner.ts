@@ -1,5 +1,6 @@
 import { glob } from 'glob';
 import path from 'node:path';
+import fs from 'node:fs/promises';
 import { 
   hasFilters, 
   parseFilters, 
@@ -10,15 +11,43 @@ import {
   createCustomContext,
   matchFilters,
   isBaseFile,
+  isFilteredDirectory,
+  matchDirectoryFilters,
+  getBaseDirectoryName,
+  isBaseDirectory,
+  type FilterContext,
 } from './file-filters.js';
 import { getMachineName } from './machine-detector.js';
 import { getFileType } from '../adapters/adapter-factory.js';
+import {
+  NestedFilteredDirectoryError,
+  DirectoryConflictError,
+  BaseDirectoryNotSupportedError,
+  FileDirectoryConflictError,
+} from './errors.js';
 
 export interface MergeOperation {
   basePath: string | null;      // May not exist
   machinePath: string;           // Always exists (we found it)
   outputPath: string;
   type: 'json' | 'env' | 'unknown';
+}
+
+/**
+ * A directory copy operation - copies entire directory contents as-is
+ */
+export interface DirectoryCopyOperation {
+  sourcePath: string;        // Absolute path to machine-specific directory
+  outputPath: string;        // Absolute path to output directory
+  type: 'directory';
+}
+
+/**
+ * Combined scan result containing both file merge and directory copy operations
+ */
+export interface ScanResult {
+  mergeOperations: MergeOperation[];
+  directoryOperations: DirectoryCopyOperation[];
 }
 
 /**
@@ -279,3 +308,273 @@ function createMergeOperation(
     type,
   };
 }
+
+// ============================================================================
+// Directory Scanning
+// ============================================================================
+
+/**
+ * Scan for machine-specific directories
+ * Returns array of directory copy operations for matching directories
+ */
+export async function scanForDirectoryOperations(
+  machineName: string,
+  cwd: string = process.cwd()
+): Promise<DirectoryCopyOperation[]> {
+  const operations: DirectoryCopyOperation[] = [];
+  const context = createCustomContext({ machine: machineName });
+  
+  // Find all directories with filter syntax
+  const pattern = '**/*{*}*';
+  
+  try {
+    // Note: onlyDirectories is a valid glob option but not in @types/glob
+    const potentialDirs = await glob(pattern, {
+      cwd,
+      ignore: ['node_modules/**', '.git/**', 'dist/**'],
+      onlyDirectories: true,
+      dot: true,
+    } as Parameters<typeof glob>[1]);
+    
+    // Filter to only actual directories (workaround for glob bug on Windows
+    // where files with {*} in name are incorrectly returned with onlyDirectories)
+    const dirs: string[] = [];
+    for (const entry of potentialDirs) {
+      const entryStr = String(entry);
+      const fullPath = path.join(cwd, entryStr);
+      try {
+        const stat = await fs.stat(fullPath);
+        if (stat.isDirectory()) {
+          dirs.push(entryStr);
+        }
+      } catch {
+        // Skip entries that can't be stat'd
+      }
+    }
+    
+    for (const dir of dirs) {
+      const dirname = path.basename(dir);
+      const parentDir = path.dirname(dir);
+      
+      // Check if this is a filtered directory
+      if (!isFilteredDirectory(dirname)) {
+        continue;
+      }
+      
+      // Check for base directory pattern (not supported)
+      if (isBaseDirectory(dirname)) {
+        throw new BaseDirectoryNotSupportedError(dir);
+      }
+      
+      // Check for nested filtered directories
+      await validateNoNestedFilters(dir, cwd);
+      
+      // Check if this directory matches the current context
+      const result = matchDirectoryFilters(dirname, context);
+      if (!result.matches) {
+        continue;
+      }
+      
+      // Create the operation
+      const baseDir = getBaseDirectoryName(dirname);
+      const sourcePath = path.join(cwd, dir);
+      const outputPath = path.join(cwd, parentDir, baseDir);
+      
+      operations.push({
+        sourcePath,
+        outputPath,
+        type: 'directory',
+      });
+    }
+  } catch (error) {
+    // Re-throw our custom errors
+    if (error instanceof NestedFilteredDirectoryError ||
+        error instanceof BaseDirectoryNotSupportedError) {
+      throw error;
+    }
+    // Ignore other glob errors
+  }
+  
+  // Validate no conflicts between matching directories
+  validateNoDirectoryConflicts(operations);
+  
+  return operations;
+}
+
+/**
+ * Validate that a directory path doesn't contain nested filtered directories
+ */
+async function validateNoNestedFilters(dirPath: string, cwd: string): Promise<void> {
+  const parts = dirPath.split(/[/\\]/);
+  let filteredAncestor: string | null = null;
+  
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (isFilteredDirectory(part)) {
+      if (filteredAncestor !== null) {
+        // Found a nested filtered directory
+        const outerPath = parts.slice(0, parts.indexOf(filteredAncestor) + 1).join('/');
+        throw new NestedFilteredDirectoryError(outerPath, dirPath);
+      }
+      filteredAncestor = part;
+    }
+  }
+}
+
+/**
+ * Validate that no two directory operations would output to the same path
+ */
+function validateNoDirectoryConflicts(operations: DirectoryCopyOperation[]): void {
+  const outputMap = new Map<string, string[]>();
+  
+  for (const op of operations) {
+    const existing = outputMap.get(op.outputPath) || [];
+    existing.push(op.sourcePath);
+    outputMap.set(op.outputPath, existing);
+  }
+  
+  for (const [output, sources] of outputMap.entries()) {
+    if (sources.length > 1) {
+      throw new DirectoryConflictError(output, sources);
+    }
+  }
+}
+
+/**
+ * Get the set of directories that are machine-specific (have filters)
+ * Used to exclude files inside these directories from regular file scanning
+ */
+export async function getFilteredDirectoryPaths(
+  cwd: string = process.cwd()
+): Promise<Set<string>> {
+  const filteredDirs = new Set<string>();
+  
+  const pattern = '**/*{*}*';
+  
+  try {
+    // Note: onlyDirectories is a valid glob option but not in @types/glob
+    const potentialDirs = await glob(pattern, {
+      cwd,
+      ignore: ['node_modules/**', '.git/**', 'dist/**'],
+      onlyDirectories: true,
+      dot: true,
+    } as Parameters<typeof glob>[1]);
+    
+    // Filter to only actual directories (workaround for glob bug on Windows)
+    for (const entry of potentialDirs) {
+      const entryStr = String(entry);
+      const fullPath = path.join(cwd, entryStr);
+      try {
+        const stat = await fs.stat(fullPath);
+        if (stat.isDirectory()) {
+          const dirname = path.basename(entryStr);
+          if (isFilteredDirectory(dirname)) {
+            filteredDirs.add(fullPath);
+          }
+        }
+      } catch {
+        // Skip entries that can't be stat'd
+      }
+    }
+  } catch {
+    // Ignore glob errors
+  }
+  
+  return filteredDirs;
+}
+
+/**
+ * Check if a file path is inside a filtered directory
+ */
+export function isInsideFilteredDirectory(
+  filePath: string,
+  filteredDirs: Set<string>
+): boolean {
+  const normalizedPath = path.normalize(filePath);
+  
+  for (const dir of filteredDirs) {
+    const normalizedDir = path.normalize(dir);
+    if (normalizedPath.startsWith(normalizedDir + path.sep) || 
+        normalizedPath === normalizedDir) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Validate no conflicts between file merge operations and directory copy operations
+ */
+export function validateNoFileDirectoryConflicts(
+  mergeOperations: MergeOperation[],
+  directoryOperations: DirectoryCopyOperation[]
+): void {
+  // Build a set of all file output paths
+  const fileOutputs = new Map<string, string>();
+  for (const op of mergeOperations) {
+    fileOutputs.set(op.outputPath, op.machinePath);
+  }
+  
+  // Check each directory operation for conflicts
+  // A directory operation at path X would produce files at X/*
+  // If any file output starts with X/, there's a conflict
+  for (const dirOp of directoryOperations) {
+    const dirOutputPath = dirOp.outputPath;
+    
+    for (const [fileOutput, fileSource] of fileOutputs.entries()) {
+      // Check if file output is inside or equal to directory output
+      const normalizedDir = path.normalize(dirOutputPath);
+      const normalizedFile = path.normalize(fileOutput);
+      
+      if (normalizedFile.startsWith(normalizedDir + path.sep)) {
+        throw new FileDirectoryConflictError(
+          fileOutput,
+          fileSource,
+          dirOp.sourcePath
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Unified scan function that returns both file and directory operations
+ */
+export async function scanAllOperations(
+  machineName: string,
+  cwd: string = process.cwd()
+): Promise<ScanResult> {
+  // First, get all filtered directories so we can exclude files inside them
+  const filteredDirs = await getFilteredDirectoryPaths(cwd);
+  
+  // Scan for directory operations
+  const directoryOperations = await scanForDirectoryOperations(machineName, cwd);
+  
+  // Scan for file merge operations (excluding files inside filtered directories)
+  const allMergeOperations = await scanForMergeOperations(machineName, cwd);
+  
+  // Filter out any merge operations for files inside filtered directories
+  const mergeOperations = allMergeOperations.filter(op => {
+    // Check both machinePath and basePath - if either is inside a filtered directory, exclude
+    const machinePath = op.machinePath;
+    const basePath = op.basePath;
+    
+    if (machinePath && isInsideFilteredDirectory(machinePath, filteredDirs)) {
+      return false;
+    }
+    if (basePath && isInsideFilteredDirectory(basePath, filteredDirs)) {
+      return false;
+    }
+    return true;
+  });
+  
+  // Validate no conflicts between file and directory operations
+  validateNoFileDirectoryConflicts(mergeOperations, directoryOperations);
+  
+  return {
+    mergeOperations,
+    directoryOperations,
+  };
+}
+

@@ -1,6 +1,6 @@
 {
   "name": "permachine",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Automatically merge machine-specific config files with base configs using git hooks",
   "type": "module",
   "bin": {

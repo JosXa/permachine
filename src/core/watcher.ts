@@ -1,8 +1,9 @@
 import chokidar from 'chokidar';
 import path from 'node:path';
-import type { MergeOperation } from './file-scanner.js';
-import { scanForMergeOperations } from './file-scanner.js';
+import type { MergeOperation, DirectoryCopyOperation } from './file-scanner.js';
+import { scanForMergeOperations, scanAllOperations, getFilteredDirectoryPaths } from './file-scanner.js';
 import { performMerge } from './merger.js';
+import { performDirectoryCopy } from './directory-copier.js';
 import { logger } from '../utils/logger.js';
 
 export interface WatchOptions {
@@ -13,8 +14,10 @@ export interface WatchOptions {
 
 interface WatcherState {
   operations: MergeOperation[];
+  directoryOperations: DirectoryCopyOperation[];
   debounceTimers: Map<string, NodeJS.Timeout>;
   operationsByPath: Map<string, MergeOperation[]>;
+  directorySourcePaths: Set<string>;  // Paths to machine-specific directories
 }
 
 /**
@@ -68,6 +71,40 @@ function getWatchPaths(operations: MergeOperation[]): string[] {
 }
 
 /**
+ * Get all directory paths to watch (contents of machine-specific directories)
+ */
+function getDirectoryWatchPatterns(directoryOperations: DirectoryCopyOperation[]): string[] {
+  const patterns: string[] = [];
+  
+  for (const op of directoryOperations) {
+    // Watch all files inside the source directory
+    patterns.push(path.join(op.sourcePath, '**', '*'));
+  }
+  
+  return patterns;
+}
+
+/**
+ * Find which directory operation is affected by a file change
+ */
+function findAffectedDirectoryOperation(
+  changedPath: string,
+  directoryOperations: DirectoryCopyOperation[]
+): DirectoryCopyOperation | null {
+  const normalizedPath = path.normalize(changedPath);
+  
+  for (const op of directoryOperations) {
+    const normalizedSource = path.normalize(op.sourcePath);
+    if (normalizedPath.startsWith(normalizedSource + path.sep) ||
+        normalizedPath === normalizedSource) {
+      return op;
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Perform merge for a specific changed file
  */
 async function handleFileChange(
@@ -75,10 +112,37 @@ async function handleFileChange(
   state: WatcherState,
   options: WatchOptions
 ): Promise<void> {
-  const relPath = path.relative(options.cwd || process.cwd(), changedPath);
+  const cwd = options.cwd || process.cwd();
+  const relPath = path.relative(cwd, changedPath);
   
   if (!logger.isSilent() && !options.verbose) {
     console.log(`[${formatTime()}] Changed: ${relPath}`);
+  }
+  
+  // Check if this is inside a machine-specific directory
+  const affectedDirOp = findAffectedDirectoryOperation(changedPath, state.directoryOperations);
+  
+  if (affectedDirOp) {
+    // This file is inside a machine-specific directory - re-copy the whole directory
+    const result = await performDirectoryCopy(affectedDirOp);
+    
+    if (result.success && result.changed) {
+      const srcName = path.basename(affectedDirOp.sourcePath);
+      const outName = path.basename(affectedDirOp.outputPath);
+      
+      if (!logger.isSilent()) {
+        console.log(`[${formatTime()}] Copied ${srcName}/ -> ${outName}/ (${result.filesWritten} file(s))`);
+      }
+    } else if (!result.success && result.error) {
+      logger.error(`Failed to copy directory: ${result.error.message}`);
+    } else if (options.verbose && !result.changed) {
+      logger.info(`No changes needed for ${path.basename(affectedDirOp.outputPath)}/`);
+    }
+    
+    if (!logger.isSilent() && !options.verbose) {
+      console.log('Ready\n');
+    }
+    return;
   }
   
   // Find all operations affected by this file
@@ -102,9 +166,9 @@ async function handleFileChange(
       
       if (!logger.isSilent()) {
         if (baseFile) {
-          console.log(`[${formatTime()}] Merged ${baseFile} + ${machineFile} → ${outputFile}`);
+          console.log(`[${formatTime()}] Merged ${baseFile} + ${machineFile} -> ${outputFile}`);
         } else {
-          console.log(`[${formatTime()}] Copied ${machineFile} → ${outputFile}`);
+          console.log(`[${formatTime()}] Copied ${machineFile} -> ${outputFile}`);
         }
       }
     } else if (!result.success && result.error) {
@@ -115,7 +179,7 @@ async function handleFileChange(
   }
   
   if (!logger.isSilent() && !options.verbose) {
-    console.log('✓ Ready\n');
+    console.log('Ready\n');
   }
 }
 
@@ -129,40 +193,49 @@ export async function startWatcher(
   const cwd = options.cwd || process.cwd();
   const debounceMs = options.debounce ?? 300;
   
-  // Initial scan for operations
-  const operations = await scanForMergeOperations(machineName, cwd);
+  // Use unified scanning to get both file and directory operations
+  const { mergeOperations, directoryOperations } = await scanAllOperations(machineName, cwd);
   
-  if (operations.length === 0) {
-    logger.warn('No machine-specific files found to watch');
+  if (mergeOperations.length === 0 && directoryOperations.length === 0) {
+    logger.warn('No machine-specific files or directories found to watch');
     logger.info('');
     logger.info('Next steps:');
     logger.info('1. Create base config files (e.g., config.base.json)');
-    logger.info(`2. Create machine-specific configs (e.g., config.${machineName}.json)`);
-    logger.info('3. Run: permachine watch');
+    logger.info(`2. Create machine-specific configs (e.g., config.{machine=${machineName}}.json)`);
+    logger.info('3. Or create machine-specific directories (e.g., mydir.{machine=' + machineName + '}/)');
+    logger.info('4. Run: permachine watch');
     return () => {};
   }
   
   // Build state
   const state: WatcherState = {
-    operations,
+    operations: mergeOperations,
+    directoryOperations,
     debounceTimers: new Map(),
-    operationsByPath: buildOperationMap(operations),
+    operationsByPath: buildOperationMap(mergeOperations),
+    directorySourcePaths: new Set(directoryOperations.map(op => op.sourcePath)),
   };
   
-  const watchPaths = getWatchPaths(operations);
+  // Get all paths to watch
+  const fileWatchPaths = getWatchPaths(mergeOperations);
+  const dirWatchPatterns = getDirectoryWatchPatterns(directoryOperations);
+  const allWatchPaths = [...fileWatchPaths, ...dirWatchPatterns];
   
   // Show what we're watching
   logger.success(`Machine detected: ${machineName}`);
   if (!logger.isSilent()) {
-    console.log(`✓ Watching ${watchPaths.length} file(s) for changes...`);
-    for (const watchPath of watchPaths) {
+    console.log(`Watching ${fileWatchPaths.length} file(s) and ${directoryOperations.length} directory(ies) for changes...`);
+    for (const watchPath of fileWatchPaths) {
       console.log(`  - ${path.relative(cwd, watchPath)}`);
+    }
+    for (const op of directoryOperations) {
+      console.log(`  - ${path.relative(cwd, op.sourcePath)}${path.sep}**`);
     }
     console.log('');
   }
   
   // Create watcher
-  const watcher = chokidar.watch(watchPaths, {
+  const watcher = chokidar.watch(allWatchPaths, {
     persistent: true,
     ignoreInitial: true,
     awaitWriteFinish: {
@@ -203,9 +276,12 @@ export async function startWatcher(
     }
     
     // Re-scan for operations in case a new base/machine file was added
-    const newOperations = await scanForMergeOperations(machineName, cwd);
-    state.operations = newOperations;
-    state.operationsByPath = buildOperationMap(newOperations);
+    const { mergeOperations: newMergeOps, directoryOperations: newDirOps } = 
+      await scanAllOperations(machineName, cwd);
+    state.operations = newMergeOps;
+    state.directoryOperations = newDirOps;
+    state.operationsByPath = buildOperationMap(newMergeOps);
+    state.directorySourcePaths = new Set(newDirOps.map(op => op.sourcePath));
     
     // Trigger merge for the new file
     await handleFileChange(absolutePath, state, options);
@@ -221,8 +297,9 @@ export async function startWatcher(
   });
   
   // Handle errors
-  watcher.on('error', (error: Error) => {
-    logger.error(`Watcher error: ${error.message}`);
+  watcher.on('error', (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Watcher error: ${message}`);
   });
   
   // Return cleanup function
@@ -237,7 +314,7 @@ export async function startWatcher(
     await watcher.close();
     
     if (!logger.isSilent()) {
-      console.log('✓ Stopped watching');
+      console.log('Stopped watching');
     }
   };
 }

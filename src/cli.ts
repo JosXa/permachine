@@ -2,12 +2,15 @@
 
 import minimist from 'minimist';
 import { getMachineName } from './core/machine-detector.js';
-import { scanForMergeOperations } from './core/file-scanner.js';
+import { scanForMergeOperations, scanAllOperations, type MergeOperation, type DirectoryCopyOperation } from './core/file-scanner.js';
 import { performAllMerges } from './core/merger.js';
+import { performAllDirectoryCopies } from './core/directory-copier.js';
+import { cleanupStaleOutputs, getDeletedPath } from './core/cleanup.js';
 import { manageGitignore, isFileTrackedByGit } from './core/gitignore-manager.js';
 import { installHooks, uninstallHooks } from './core/git-hooks.js';
 import { startWatcher } from './core/watcher.js';
 import { logger } from './utils/logger.js';
+import { PermachineError } from './core/errors.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -220,22 +223,25 @@ async function handleInit(argv: any) {
 async function handleMerge(argv: any) {
   try {
     const machineName = getMachineName();
-    const operations = await scanForMergeOperations(machineName);
+    const cwd = process.cwd();
+    
+    // Use unified scanning to get both file and directory operations
+    const { mergeOperations, directoryOperations } = await scanAllOperations(machineName, cwd);
 
-    if (operations.length === 0) {
+    if (mergeOperations.length === 0 && directoryOperations.length === 0) {
       // Silent exit if no operations found
       return;
     }
 
     // Check which output files are tracked by git (only prompt if not silent)
     if (!argv.silent && !argv['no-gitignore']) {
-      const trackedFiles = await checkTrackedOutputFiles(operations);
+      const trackedFiles = await checkTrackedOutputFiles(mergeOperations);
       
       if (trackedFiles.length > 0) {
         // Show warning about files that will be affected
-        logger.warn('⚠️  Warning: The following files will be overwritten and untracked from git:');
+        logger.warn('Warning: The following files will be overwritten and untracked from git:');
         for (const file of trackedFiles) {
-          logger.warn(`  - ${path.relative(process.cwd(), file)}`);
+          logger.warn(`  - ${path.relative(cwd, file)}`);
         }
         logger.info('');
         
@@ -250,30 +256,67 @@ async function handleMerge(argv: any) {
       }
     }
 
-    const results = await performAllMerges(operations);
+    // Collect all output paths for gitignore and cleanup
+    const allOutputPaths: string[] = [];
+    
+    // Process file merge operations
+    const mergeResults = await performAllMerges(mergeOperations);
+    for (const result of mergeResults) {
+      allOutputPaths.push(result.operation.outputPath);
+    }
+    
+    // Process directory copy operations
+    const dirResults = await performAllDirectoryCopies(directoryOperations);
+    for (const result of dirResults) {
+      allOutputPaths.push(result.operation.outputPath);
+    }
+    
+    // Cleanup stale outputs
+    const cleanupResult = await cleanupStaleOutputs(allOutputPaths, cwd);
     
     // Manage gitignore
-    const outputPaths = operations.map(op => op.outputPath);
-    await manageGitignore(outputPaths, { noGitignore: argv['no-gitignore'] });
+    await manageGitignore(allOutputPaths, { noGitignore: argv['no-gitignore'] });
     
     // Count successful changes
-    const changed = results.filter(r => r.changed).length;
-    const failed = results.filter(r => !r.success && r.error).length;
+    const filesChanged = mergeResults.filter(r => r.changed).length;
+    const filesFailed = mergeResults.filter(r => !r.success && r.error).length;
+    const dirsChanged = dirResults.filter(r => r.changed).length;
+    const dirsFailed = dirResults.filter(r => !r.success && r.error).length;
+    const staleCount = cleanupResult.renamedFiles.length + cleanupResult.renamedDirectories.length;
 
     if (!logger.isSilent()) {
-      if (changed > 0) {
-        logger.success(`Merged ${changed} file(s)`);
+      if (filesChanged > 0) {
+        logger.success(`Merged ${filesChanged} file(s)`);
       }
-      if (failed > 0) {
-        logger.error(`Failed to merge ${failed} file(s)`);
+      if (dirsChanged > 0) {
+        logger.success(`Copied ${dirsChanged} directory(ies)`);
+      }
+      if (staleCount > 0) {
+        logger.info(`Cleaned up ${staleCount} stale output(s):`);
+        for (const file of cleanupResult.renamedFiles) {
+          logger.info(`  Renamed: ${path.relative(cwd, file)} -> ${path.basename(getDeletedPath(file))}`);
+        }
+        for (const dir of cleanupResult.renamedDirectories) {
+          logger.info(`  Renamed: ${path.relative(cwd, dir)}/ -> ${path.basename(getDeletedPath(dir))}/`);
+        }
+      }
+      if (filesFailed > 0) {
+        logger.error(`Failed to merge ${filesFailed} file(s)`);
+      }
+      if (dirsFailed > 0) {
+        logger.error(`Failed to copy ${dirsFailed} directory(ies)`);
       }
     }
 
-    if (failed > 0) {
+    if (filesFailed > 0 || dirsFailed > 0) {
       process.exit(1);
     }
   } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
+    if (error instanceof PermachineError) {
+      logger.error(error.message);
+    } else {
+      logger.error(error instanceof Error ? error.message : String(error));
+    }
     process.exit(1);
   }
 }
@@ -281,10 +324,11 @@ async function handleMerge(argv: any) {
 async function handleInfo(argv: any) {
   try {
     const machineName = getMachineName();
-    const operations = await scanForMergeOperations(machineName);
+    const cwd = process.cwd();
+    const { mergeOperations, directoryOperations } = await scanAllOperations(machineName, cwd);
 
     console.log(`Machine name: ${machineName}`);
-    console.log(`Repository: ${process.cwd()}`);
+    console.log(`Repository: ${cwd}`);
     
     // Check hooks method
     const { exec } = await import('node:child_process');
@@ -304,28 +348,62 @@ async function handleInfo(argv: any) {
       console.log(`Hooks method: not installed`);
     }
 
-    console.log(`Tracked patterns: ${operations.length}`);
-    for (const op of operations) {
+    // Show file merge operations
+    console.log(`\nFile merge operations: ${mergeOperations.length}`);
+    for (const op of mergeOperations) {
       const baseName = op.basePath ? path.basename(op.basePath) : '(none)';
-      const machineName = path.basename(op.machinePath);
+      const machineBaseName = path.basename(op.machinePath);
       const outputName = path.basename(op.outputPath);
-      console.log(`  - ${baseName} + ${machineName} → ${outputName}`);
+      console.log(`  - ${baseName} + ${machineBaseName} -> ${outputName}`);
+    }
+    
+    // Show directory copy operations
+    if (directoryOperations.length > 0) {
+      console.log(`\nDirectory copy operations: ${directoryOperations.length}`);
+      for (const op of directoryOperations) {
+        const srcName = path.basename(op.sourcePath);
+        const outName = path.basename(op.outputPath);
+        console.log(`  - ${srcName}/ -> ${outName}/`);
+      }
     }
     
     // Show which output files currently exist
-    if (operations.length > 0) {
-      const existingFiles = await checkExistingOutputFiles(operations);
+    if (mergeOperations.length > 0) {
+      const existingFiles = await checkExistingOutputFiles(mergeOperations);
       console.log('');
-      console.log(`Output files: ${operations.length} total, ${existingFiles.length} existing`);
+      console.log(`Output files: ${mergeOperations.length} total, ${existingFiles.length} existing`);
       if (existingFiles.length > 0) {
         console.log('Existing output files:');
         for (const file of existingFiles) {
-          console.log(`  - ${path.relative(process.cwd(), file)}`);
+          console.log(`  - ${path.relative(cwd, file)}`);
+        }
+      }
+    }
+    
+    // Show existing output directories
+    if (directoryOperations.length > 0) {
+      const existingDirs: string[] = [];
+      for (const op of directoryOperations) {
+        try {
+          await fs.access(op.outputPath);
+          existingDirs.push(op.outputPath);
+        } catch {
+          // Directory doesn't exist
+        }
+      }
+      if (existingDirs.length > 0) {
+        console.log('Existing output directories:');
+        for (const dir of existingDirs) {
+          console.log(`  - ${path.relative(cwd, dir)}/`);
         }
       }
     }
   } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
+    if (error instanceof PermachineError) {
+      logger.error(error.message);
+    } else {
+      logger.error(error instanceof Error ? error.message : String(error));
+    }
     process.exit(1);
   }
 }
