@@ -114,21 +114,9 @@ export async function scanForMergeOperations(
       // New syntax - check if it matches current context with custom machine name
       const result = matchFilters(basename, context);
       shouldProcess = result.matches;
-      
-      // Even if it doesn't match, track that this base file has machine-specific versions
-      const operation = createMergeOperation(file, machineName, cwd);
-      if (operation && operation.basePath) {
-        baseFilesWithMachineFiles.add(operation.basePath);
-      }
     } else if (isLegacyFilename(basename, machineName)) {
       // Legacy syntax - always process if it matches machine name
       shouldProcess = true;
-      
-      // Track that this base file has machine-specific versions
-      const operation = createMergeOperation(file, machineName, cwd);
-      if (operation && operation.basePath) {
-        baseFilesWithMachineFiles.add(operation.basePath);
-      }
     }
     
     if (shouldProcess) {
@@ -136,6 +124,11 @@ export async function scanForMergeOperations(
       if (operation) {
         operations.push(operation);
         processedOutputs.add(operation.outputPath);
+        // Only track base files that have MATCHING machine-specific versions
+        // (not just any machine-specific file that exists)
+        if (operation.basePath) {
+          baseFilesWithMachineFiles.add(operation.basePath);
+        }
       }
     }
   }

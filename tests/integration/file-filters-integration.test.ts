@@ -32,7 +32,7 @@ describe('file-filters integration', () => {
     expect(operations[0].outputPath).toContain('config.json');
   });
 
-  test('does not find files with filter that does not match current OS', async () => {
+  test('uses base file when machine-specific file does not match current OS', async () => {
     // Create a file with OS filter NOT matching current platform
     const nonMatchingOS = context.os === 'windows' ? 'macos' : 'windows';
     await testRepo.writeFile(
@@ -43,7 +43,10 @@ describe('file-filters integration', () => {
 
     const operations = await scanForMergeOperations('homezone', testRepo.path);
 
-    expect(operations).toHaveLength(0);
+    // Base file should be used as fallback when no machine-specific file matches
+    expect(operations).toHaveLength(1);
+    expect(operations[0].basePath).toContain('config.base.json');
+    expect(operations[0].machinePath).toBe(''); // No matching machine file
   });
 
   test('finds files with multiple filters (AND logic)', async () => {
@@ -60,7 +63,7 @@ describe('file-filters integration', () => {
     expect(operations[0].outputPath).toContain('secrets.json');
   });
 
-  test('does not find files when one filter in AND chain fails', async () => {
+  test('uses base file when AND chain filter does not match', async () => {
     const nonMatchingOS = context.os === 'windows' ? 'macos' : 'windows';
     
     await testRepo.writeFile(
@@ -71,7 +74,10 @@ describe('file-filters integration', () => {
 
     const operations = await scanForMergeOperations('homezone', testRepo.path);
 
-    expect(operations).toHaveLength(0);
+    // Base file should be used as fallback when no machine-specific file matches
+    expect(operations).toHaveLength(1);
+    expect(operations[0].basePath).toContain('secrets.base.json');
+    expect(operations[0].machinePath).toBe(''); // No matching machine file
   });
 
   test('supports OR logic with comma-separated values', async () => {
@@ -206,4 +212,30 @@ describe('file-filters integration', () => {
 
   // Wildcard test skipped: tilde character not allowed in Windows filenames
   // Wildcard matching logic is thoroughly tested in unit tests
+
+  test('base file should be used when machine-specific files exist for OTHER machines only', async () => {
+    // This is the bug: when machine-specific files exist for other machines,
+    // but NOT for the current machine, the base file should still be processed.
+    // 
+    // Scenario: You're on machine "wsl-nixos" but only have:
+    // - opencode.base.jsonc
+    // - opencode.{machine=homezone}.jsonc
+    // - opencode.{machine=tvdem00laax}.jsonc
+    //
+    // Expected: opencode.json should be created from base file
+    // Actual (bug): opencode.json is NOT created because base file is skipped
+    
+    await testRepo.writeFile('config.base.json', '{"shared": true}');
+    await testRepo.writeFile('config.{machine=other-machine}.json', '{"specific": "other"}');
+    await testRepo.writeFile('config.{machine=another-machine}.json', '{"specific": "another"}');
+
+    // Scan as a machine that has NO matching machine-specific file
+    const operations = await scanForMergeOperations('my-machine', testRepo.path);
+
+    // Should find the base file and create a merge operation for it
+    expect(operations).toHaveLength(1);
+    expect(operations[0].outputPath).toContain('config.json');
+    expect(operations[0].basePath).toContain('config.base.json');
+    expect(operations[0].machinePath).toBe(''); // No machine file matches
+  });
 });
