@@ -9,7 +9,7 @@ import { cleanupStaleOutputs, getDeletedPath } from './core/cleanup.js';
 import { manageGitignore, isFileTrackedByGit } from './core/gitignore-manager.js';
 import { installHooks, uninstallHooks } from './core/git-hooks.js';
 import { startWatcher } from './core/watcher.js';
-import { logger } from './utils/logger.js';
+import { logger, plural } from './utils/logger.js';
 import { PermachineError } from './core/errors.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -141,7 +141,7 @@ async function handleInit(argv: any) {
     const operations = await scanForMergeOperations(machineName);
     
     if (operations.length > 0) {
-      logger.info(`Found ${operations.length} machine-specific file(s)`);
+      logger.info(`Found ${plural(operations.length, 'machine-specific file')}`);
       
       // Check which output files are tracked by git
       const trackedFiles = await checkTrackedOutputFiles(operations);
@@ -182,7 +182,7 @@ async function handleInit(argv: any) {
       const changed = results.filter(r => r.changed).length;
       
       if (changed > 0) {
-        logger.success(`Merged ${changed} file(s)`);
+        logger.success(`Merged ${plural(changed, 'file')}`);
       }
 
       // Manage gitignore
@@ -190,10 +190,10 @@ async function handleInit(argv: any) {
       const gitignoreResult = await manageGitignore(outputPaths, { noGitignore: argv['no-gitignore'] });
       
       if (gitignoreResult.added.length > 0) {
-        logger.success(`Added ${gitignoreResult.added.length} file(s) to .gitignore`);
+        logger.success(`Added ${plural(gitignoreResult.added.length, 'file')} to .gitignore`);
       }
       if (gitignoreResult.removed.length > 0) {
-        logger.success(`Removed ${gitignoreResult.removed.length} file(s) from git tracking`);
+        logger.success(`Removed ${plural(gitignoreResult.removed.length, 'file')} from git tracking`);
       }
       if (gitignoreResult.errors.length > 0) {
         for (const error of gitignoreResult.errors) {
@@ -286,10 +286,10 @@ async function handleMerge(argv: any) {
 
     if (!logger.isSilent()) {
       if (filesChanged > 0) {
-        logger.success(`Merged ${filesChanged} file(s)`);
+        logger.success(`Merged ${plural(filesChanged, 'file')}`);
       }
       if (dirsChanged > 0) {
-        logger.success(`Copied ${dirsChanged} directory(ies)`);
+        logger.success(`Copied ${plural(dirsChanged, 'directory', 'directories')}`);
       }
       if (staleCount > 0) {
         logger.info(`Cleaned up ${staleCount} stale output(s):`);
@@ -301,10 +301,10 @@ async function handleMerge(argv: any) {
         }
       }
       if (filesFailed > 0) {
-        logger.error(`Failed to merge ${filesFailed} file(s)`);
+        logger.error(`Failed to merge ${plural(filesFailed, 'file')}`);
       }
       if (dirsFailed > 0) {
-        logger.error(`Failed to copy ${dirsFailed} directory(ies)`);
+        logger.error(`Failed to copy ${plural(dirsFailed, 'directory', 'directories')}`);
       }
     }
 

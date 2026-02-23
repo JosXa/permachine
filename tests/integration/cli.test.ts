@@ -42,7 +42,7 @@ describe('CLI --yes flag', () => {
     expect(stderr).not.toContain('(y/N)');
 
     // Should have merged successfully
-    expect(stdout).toContain('Merged 1 file(s)');
+    expect(stdout).toContain('Merged 1 file');
 
     // Should have untracked the file since it was tracked
     expect(stdout).toContain('Removed test.json from git tracking');
@@ -71,7 +71,7 @@ describe('CLI --yes flag', () => {
     expect(stdout).not.toContain('(y/N)');
 
     // Should have merged successfully
-    expect(stdout).toContain('Merged 1 file(s)');
+    expect(stdout).toContain('Merged 1 file');
   });
 
   test('merge without --yes should work for non-tracked files', async () => {
@@ -91,7 +91,7 @@ describe('CLI --yes flag', () => {
     expect(stdout).not.toContain('(y/N)');
 
     // Should have merged successfully
-    expect(stdout).toContain('Merged 1 file(s)');
+    expect(stdout).toContain('Merged 1 file');
   });
 
   test('merge should create output from base file only when no machine-specific override exists', async () => {
@@ -107,7 +107,7 @@ describe('CLI --yes flag', () => {
     const { stdout } = await execAsync(`node "${cliPath}" merge`, { cwd: repo.path });
 
     // Should have merged successfully
-    expect(stdout).toContain('Merged 1 file(s)');
+    expect(stdout).toContain('Merged 1 file');
 
     // Should not show warning or prompt (file not tracked)
     expect(stdout).not.toContain('Warning');

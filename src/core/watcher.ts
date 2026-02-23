@@ -4,7 +4,7 @@ import type { MergeOperation, DirectoryCopyOperation } from './file-scanner.js';
 import { scanForMergeOperations, scanAllOperations, getFilteredDirectoryPaths } from './file-scanner.js';
 import { performMerge, performAllMerges } from './merger.js';
 import { performDirectoryCopy, performAllDirectoryCopies } from './directory-copier.js';
-import { logger } from '../utils/logger.js';
+import { logger, plural } from '../utils/logger.js';
 
 export interface WatchOptions {
   debounce?: number;
@@ -131,7 +131,7 @@ async function handleFileChange(
       const outName = path.basename(affectedDirOp.outputPath);
       
       if (!logger.isSilent()) {
-        console.log(`[${formatTime()}] Copied ${srcName}/ -> ${outName}/ (${result.filesWritten} file(s))`);
+        console.log(`[${formatTime()}] Copied ${srcName}/ -> ${outName}/ (${plural(result.filesWritten, 'file')})`);
       }
     } else if (!result.success && result.error) {
       logger.error(`Failed to copy directory: ${result.error.message}`);
@@ -212,7 +212,7 @@ export async function startWatcher(
     const mergeResults = await performAllMerges(mergeOperations);
     const changedFiles = mergeResults.filter(r => r.changed).length;
     if (changedFiles > 0 && !logger.isSilent()) {
-      console.log(`[${formatTime()}] Initial merge: ${changedFiles} file(s) updated`);
+      console.log(`[${formatTime()}] Initial merge: ${plural(changedFiles, 'file')} updated`);
     }
   }
   
@@ -220,7 +220,7 @@ export async function startWatcher(
     const dirResults = await performAllDirectoryCopies(directoryOperations);
     const changedDirs = dirResults.filter(r => r.changed).length;
     if (changedDirs > 0 && !logger.isSilent()) {
-      console.log(`[${formatTime()}] Initial copy: ${changedDirs} directory(ies) updated`);
+      console.log(`[${formatTime()}] Initial copy: ${plural(changedDirs, 'directory', 'directories')} updated`);
     }
   }
   
@@ -241,7 +241,7 @@ export async function startWatcher(
   // Show what we're watching
   logger.success(`Machine detected: ${machineName}`);
   if (!logger.isSilent()) {
-    console.log(`Watching ${fileWatchPaths.length} file(s) and ${directoryOperations.length} directory(ies) for changes...`);
+    console.log(`Watching ${plural(fileWatchPaths.length, 'file')} and ${plural(directoryOperations.length, 'directory', 'directories')} for changes...`);
     for (const watchPath of fileWatchPaths) {
       console.log(`  - ${path.relative(cwd, watchPath)}`);
     }

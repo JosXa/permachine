@@ -1,5 +1,16 @@
 let silent = false;
 
+/**
+ * Simple pluralization helper.
+ * plural(1, 'file') => '1 file'
+ * plural(5, 'file') => '5 files'
+ * plural(0, 'directory', 'directories') => '0 directories'
+ */
+export function plural(count: number, singular: string, pluralForm?: string): string {
+  const word = count === 1 ? singular : (pluralForm ?? `${singular}s`);
+  return `${count} ${word}`;
+}
+
 export const logger = {
   info(message: string): void {
     if (!silent) {
