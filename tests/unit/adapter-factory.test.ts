@@ -2,6 +2,7 @@ import { describe, test, expect } from 'bun:test';
 import { getAdapter } from '../../src/adapters/adapter-factory';
 import { JsonAdapter } from '../../src/adapters/json-adapter';
 import { EnvAdapter } from '../../src/adapters/env-adapter';
+import { MarkdownAdapter } from '../../src/adapters/markdown-adapter';
 
 describe('adapter-factory', () => {
   describe('getAdapter', () => {
@@ -23,6 +24,16 @@ describe('adapter-factory', () => {
     test('should return EnvAdapter for .env.base files', () => {
       const adapter = getAdapter('.env.base');
       expect(adapter).toBeInstanceOf(EnvAdapter);
+    });
+
+    test('should return MarkdownAdapter for .md files', () => {
+      const adapter = getAdapter('AGENTS.md');
+      expect(adapter).toBeInstanceOf(MarkdownAdapter);
+    });
+
+    test('should return MarkdownAdapter for .markdown files', () => {
+      const adapter = getAdapter('notes.base.markdown');
+      expect(adapter).toBeInstanceOf(MarkdownAdapter);
     });
 
     test('should return null for unsupported file types', () => {

@@ -115,6 +115,36 @@ describe('watcher integration', () => {
     }
   });
 
+  test('should watch and merge Markdown files on change', async () => {
+    await createTestFiles(repo, {
+      'AGENTS.base.md': '# Shared\n\nUse bun.\n',
+      [`AGENTS.{machine=${machineName}}.md`]: '## Local\n\nUse work profile.\n',
+    });
+
+    const stopWatcher = await startWatcher(machineName, {
+      debounce: 100,
+      cwd: repo.path,
+    });
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      await repo.writeFile(
+        `AGENTS.{machine=${machineName}}.md`,
+        '## Local\n\nUse personal profile.\n'
+      );
+
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const output = await repo.readFile('AGENTS.md');
+      expect(output).toContain('# Shared');
+      expect(output).toContain('Use personal profile.');
+      expect(output).not.toContain('Use work profile.');
+    } finally {
+      await stopWatcher();
+    }
+  });
+
   test('should debounce rapid changes', async () => {
     await createTestFiles(repo, {
       'config.base.json': JSON.stringify({ counter: 0 }, null, 2),

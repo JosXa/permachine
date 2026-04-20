@@ -106,6 +106,61 @@ describe('merge integration', () => {
     expect(output).toContain('KEY3=machine3');
   });
 
+  test('should merge Markdown files with YAML frontmatter and a blank line between bodies', async () => {
+    await createTestFiles(repo, {
+      'AGENTS.base.md': `---
+title: Base Agents
+tools:
+  shell: bun
+shared: true
+---
+# Shared
+
+Use bun.
+`,
+      [`AGENTS.{machine=${machineName}}.md`]: `---
+tools:
+  shell: bunx
+machine: ${machineName}
+---
+
+## Local
+
+Use local secrets.
+`,
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    expect(operations.length).toBe(1);
+    expect(operations[0].outputPath).toContain('AGENTS.md');
+
+    const result = await performMerge(operations[0]);
+    expect(result.success).toBe(true);
+
+    const output = await repo.readFile('AGENTS.md');
+    expect(output).toContain('title: Base Agents');
+    expect(output).toContain(`machine: ${machineName}`);
+    expect(output).toContain('shell: bunx');
+    expect(output).toContain('# Shared\n\nUse bun.\n\n## Local');
+  });
+
+  test('should merge .markdown files', async () => {
+    await createTestFiles(repo, {
+      'guide.base.markdown': '# Base\n',
+      [`guide.{machine=${machineName}}.markdown`]: '## Machine\n',
+    });
+
+    const operations = await scanForMergeOperations(machineName, repo.path);
+    expect(operations.length).toBe(1);
+    expect(operations[0].outputPath).toContain('guide.markdown');
+
+    const result = await performMerge(operations[0]);
+    expect(result.success).toBe(true);
+
+    const output = await repo.readFile('guide.markdown');
+    expect(output).toBe('# Base\n\n## Machine\n');
+  });
+
   test('should not write if output unchanged', async () => {
     const expectedOutput = JSON.stringify({ a: 1, b: 3, c: 4 }, null, 2) + '\n';
 

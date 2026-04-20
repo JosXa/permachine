@@ -519,7 +519,7 @@ For detailed implementation information, see [CONTRIBUTING.md](CONTRIBUTING.md) 
 | JSON     | `.json`               | Deep recursive merge              | ✅ Supported                                   |
 | JSONC    | `.json` with comments | Deep merge + comment preservation | ✅ Supported                                   |
 | ENV      | `.env`, `.env.*`      | Key-value upsert                  | ✅ Supported                                   |
-| Markdown | `.md`                 | Append (base + machine)           | 🔜 [Planned](#3)                               |
+| Markdown | `.md`, `.markdown`    | Append (base + machine)           | ✅ Supported                                   |
 | YAML     | `.yaml`, `.yml`       | Deep recursive merge              | 🔜 [Planned](#1)                               |
 | TOML     | `.toml`               | Deep recursive merge              | 🔜 [Planned](#2)                               |
 | Patch    | `.patch`              | Apply git-style patch to base     | 💡 [Proposed](#4) |
@@ -629,7 +629,7 @@ MIT © [JosXa](https://github.com/JosXa)
 - [x] Watch mode for development
 - [ ] YAML support ([#1](https://github.com/JosXa/permachine/issues/1))
 - [ ] TOML support ([#2](https://github.com/JosXa/permachine/issues/2))
-- [ ] Markdown support ([#3](https://github.com/JosXa/permachine/issues/3))
+- [x] Markdown support ([#3](https://github.com/JosXa/permachine/issues/3))
 - [ ] Patch file support ([#4](https://github.com/JosXa/permachine/issues/4))
 - [ ] Custom merge strategies ([#5](https://github.com/JosXa/permachine/issues/5))
 - [ ] Config file for patterns ([#6](https://github.com/JosXa/permachine/issues/6))

@@ -2,10 +2,12 @@ import path from 'node:path';
 import type { FileAdapter } from './base.js';
 import { JsonAdapter } from './json-adapter.js';
 import { EnvAdapter } from './env-adapter.js';
+import { MarkdownAdapter } from './markdown-adapter.js';
 
 const adapters: FileAdapter[] = [
   new JsonAdapter(),
   new EnvAdapter(),
+  new MarkdownAdapter(),
 ];
 
 /**
@@ -35,7 +37,7 @@ export function getAdapter(filePath: string): FileAdapter | null {
  * Determine the file type from a filename or path
  * Returns the type that corresponds to an adapter
  */
-export function getFileType(filename: string): 'json' | 'env' | 'unknown' {
+export function getFileType(filename: string): 'json' | 'env' | 'markdown' | 'unknown' {
   const basename = path.basename(filename);
   
   // Check if .env file
@@ -48,6 +50,10 @@ export function getFileType(filename: string): 'json' | 'env' | 'unknown' {
   // Check if JSON/JSONC file
   if (ext === '.json' || ext === '.jsonc') {
     return 'json';
+  }
+
+  if (ext === '.md' || ext === '.markdown') {
+    return 'markdown';
   }
   
   return 'unknown';

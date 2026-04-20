@@ -30,7 +30,7 @@ export interface MergeOperation {
   basePath: string | null;      // May not exist
   machinePath: string;           // Always exists (we found it)
   outputPath: string;
-  type: 'json' | 'env' | 'unknown';
+  type: 'json' | 'env' | 'markdown' | 'unknown';
 }
 
 /**
@@ -137,6 +137,8 @@ export async function scanForMergeOperations(
   const basePatterns = [
     '**/*.base.json',
     '**/*.base.jsonc',
+    '**/*.base.md',
+    '**/*.base.markdown',
     '**/.*.base',
     '**/.*.base.*',
   ];
@@ -193,18 +195,19 @@ function createBaseOnlyMergeOperation(
   // Derive output name from base name
   let outputName: string;
   
-  if (type === 'env') {
-    // .env.base -> .env
-    // .env.{base} -> .env
-    outputName = fullBasename.replace('.base', '').replace('.{base}', '');
-  } else {
-    // config.base.json -> config.json
-    // config.base.jsonc -> config.json (always output .json, not .jsonc)
-    outputName = fullBasename.replace('.base', '').replace('.{base}', '');
-    // Normalize .jsonc to .json for output
-    if (outputName.endsWith('.jsonc')) {
-      outputName = outputName.replace(/\.jsonc$/, '.json');
-    }
+    if (type === 'env') {
+      // .env.base -> .env
+      // .env.{base} -> .env
+      outputName = fullBasename.replace('.base', '').replace('.{base}', '');
+    } else {
+      // config.base.json -> config.json
+      // config.base.jsonc -> config.json (always output .json, not .jsonc)
+      // AGENTS.base.md -> AGENTS.md
+      outputName = fullBasename.replace('.base', '').replace('.{base}', '');
+      // Normalize .jsonc to .json for output
+      if (outputName.endsWith('.jsonc')) {
+        outputName = outputName.replace(/\.jsonc$/, '.json');
+      }
   }
 
   // Construct full paths
@@ -262,8 +265,14 @@ function createMergeOperation(
     } else {
       // config.json -> config.base.json
       // config.jsonc -> config.base.jsonc (base keeps .jsonc, output is .json)
+      // AGENTS.md -> AGENTS.base.md
       const nameWithoutExt = outputName.replace(/\.(json|jsonc)$/, '');
       baseName = nameWithoutExt + '.base' + ext;
+
+      if (type === 'markdown') {
+        const markdownNameWithoutExt = outputName.replace(/\.(md|markdown)$/, '');
+        baseName = markdownNameWithoutExt + '.base' + ext;
+      }
     }
   } else {
     // Legacy syntax: config.homezone.json
