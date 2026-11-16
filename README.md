@@ -1,186 +1,55 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/logo.png" width="128" alt="permachine logo: a laptop, a server and a desktop whose lines merge into one config file">
+
 # permachine
 
-Per-machine config management with git for tools that don't support it natively. Automatically merge machine-specific configurations with a base config.
+**One git repo, every machine, the right config on each.**<br>
+permachine merges shared base files with per-machine overrides, for tools that have no per-machine config of their own.
 
-[![npm version](https://img.shields.io/npm/v/permachine.svg)](https://www.npmjs.com/package/permachine)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<a href="https://www.npmjs.com/package/permachine"><img src="https://img.shields.io/npm/v/permachine?style=flat-square&color=994CC3&labelColor=011627&label=npm" alt="npm version"></a>
+<a href="https://www.npmjs.com/package/permachine"><img src="https://img.shields.io/npm/dm/permachine?style=flat-square&color=994CC3&labelColor=011627" alt="npm downloads per month"></a>
+<img src="https://img.shields.io/badge/merges-JSON%20%C2%B7%20JSONC%20%C2%B7%20.env%20%C2%B7%20Markdown-994CC3?style=flat-square&labelColor=011627" alt="Merges JSON, JSONC, .env and Markdown">
+<img src="https://img.shields.io/badge/runs%20on-git%20hooks-994CC3?style=flat-square&labelColor=011627&logo=git&logoColor=white" alt="Runs on git hooks">
+<a href="https://github.com/JosXa/permachine/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-011627?style=flat-square" alt="MIT license"></a>
 
-## Problem
+[**Quick start**](#-quick-start) · [File names](#-file-names-and-filters) · [Recipes](#-recipes) · [Commands](#-commands) · [Troubleshooting](#-troubleshooting)
 
-When syncing dotfiles across multiple machines, you often need:
+<br>
 
-- **Shared configuration** - Settings that work across all machines
-- **Machine-specific overrides** - Local paths, API keys, ports, etc.
-- **Automatic merging** - No manual copy-paste or merge steps
+<img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/merge.svg" width="860" alt="config.base.json and config.{machine=laptop}.json are both in git. permachine merges them into config.json, which is gitignored. Machine values win.">
 
-## Solution
+</div>
 
-`permachine` automatically:
+<br>
 
-1. Detects your machine name
-2. Finds machine-specific config files (e.g. `config.my-laptop.json`, `config.workstation.json`)
-3. Merges them with base configs (e.g., `config.base.json`)
-4. Outputs the final config (e.g., `config.json`)
-5. **Manages .gitignore** - Adds output files and removes from git tracking
-6. Runs automatically on git operations via hooks
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-lightbulb.svg" width="24" align="absmiddle" alt=""> Why
 
-## Quick Start
+You sync your dotfiles across a work laptop, a home desktop and a server. Most settings are shared, but some are not: local paths, proxies, API keys, MCP servers that exist on one machine only. Most tools read exactly one config file and have no idea which machine they run on.
 
-```bash
-# Install globally
+permachine keeps one `base` file plus small override files in git and writes the merged result on each machine:
+
+- **Detects the machine** by hostname, OS, CPU architecture, user and `NODE_ENV`.
+- **Merges** the base file with every override that matches. Machine values win.
+- **Gitignores the output** and removes it from git tracking, so merged files never get committed.
+- **Runs on its own** through git hooks on checkout, merge (`git pull`) and commit.
+
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-rocket.svg" width="24" align="absmiddle" alt=""> Quick start
+
+```sh
 npm install -g permachine
-
-# In your repository
-cd /path/to/your/repo
-
-# Initialize (one-time setup)
-permachine init
-
-# That's it! Your configs will now auto-merge on git operations when a file ends with `.<machine-name>.<ext>`
-```
-
-## CLI Reference
-
-```
-permachine - Automatically merge machine-specific config files
-
-USAGE:
-  permachine <command> [options]
-
-COMMANDS:
-  init                Initialize permachine in current repository
-  merge               Manually trigger merge operation
-  info                Show information about current setup
-  uninstall           Uninstall git hooks
-  watch               Watch for file changes and auto-merge
-
-OPTIONS:
-  --help, -h          Show this help message
-  --version, -v       Show version number
-  --silent, -s        Suppress all output except errors (for merge command)
-  --legacy            Use legacy .git/hooks wrapping (for init command)
-  --auto              Auto-detect best installation method (for init command)
-  --no-gitignore      Don't manage .gitignore or git tracking (for init/merge commands)
-  --debounce <ms>     Debounce delay in milliseconds (for watch command, default: 300)
-  --verbose           Show detailed file change events (for watch command)
-
-EXAMPLES:
-  permachine init
-  permachine merge --silent
-  permachine info
-  permachine uninstall
-  permachine watch
-  permachine watch --debounce 500 --verbose
-```
-
-## Usage
-
-### File Naming Convention
-
-**New Advanced Syntax (Recommended):**
-
-Filter-based syntax for precise control:
-
-| Purpose               | Filename                      | In Git?            |
-| --------------------- | ----------------------------- | ------------------ |
-| Base config (shared)  | `config.base.json`            | ✅ Yes             |
-| OS-specific           | `config.{os=windows}.json`    | ✅ Yes             |
-| Machine-specific      | `config.{machine=laptop}.json`| ✅ Yes             |
-| Multi-filter          | `secrets.{machine=laptop}{user=josxa}.json` | ✅ Yes |
-| Final output (merged) | `config.json`                 | ❌ No (gitignored) |
-
-**Legacy Syntax (Still Supported):**
-
-Given machine name `my-laptop` (auto-detected from hostname):
-
-| Purpose               | Filename                | In Git?            |
-| --------------------- | ----------------------- | ------------------ |
-| Base config (shared)  | `config.base.json`      | ✅ Yes             |
-| Machine-specific      | `config.my-laptop.json` | ✅ Yes             |
-| Final output (merged) | `config.json`           | ❌ No (gitignored) |
-
-**Supported Filters:**
-
-- `{os=windows}`, `{os=macos}`, `{os=linux}` - Operating system
-- `{arch=x64}`, `{arch=arm64}` - CPU architecture  
-- `{machine=hostname}` - Machine/hostname (same as legacy)
-- `{user=username}` - Username
-- `{env=prod}`, `{env=dev}` - Environment (from NODE_ENV)
-- Multiple filters: `{os=windows}{arch=x64}` (AND logic)
-- OR logic: `{os=windows,macos,linux}` (comma-separated)
-
-**📚 See [File Filters Documentation](docs/FILE_FILTERS.md) for complete guide and examples.**
-
-Same pattern works for `.env` files:
-
-| Purpose          | Filename                   | In Git?            |
-| ---------------- | -------------------------- | ------------------ |
-| Base config      | `.env.base`                | ✅ Yes             |
-| Machine-specific | `.env.{machine=laptop}`    | ✅ Yes             |
-| Final output     | `.env`                     | ❌ No (gitignored) |
-
-### Directory Matching (NEW)
-
-In addition to file-level merging, you can apply filters to **entire directories**. When a directory matches, all its contents are copied as-is to the output directory (without further filter processing or merging).
-
-**Example:**
-
-```bash
-.opencode/skills/
-├── jira.{machine=homezone}/       # Only exists on machine "homezone"
-│   ├── skill.md
-│   └── templates/
-│       └── issue.md
-├── work-tools.{machine=laptop}/   # Only exists on machine "laptop"  
-│   └── slack.md
-└── shared-skill/                  # Regular directory (always present)
-    └── common.md
-```
-
-**On machine `homezone`:**
-```bash
-.opencode/skills/
-├── jira/                          # ← Copied from jira.{machine=homezone}/
-│   ├── skill.md
-│   └── templates/
-│       └── issue.md
-└── shared-skill/
-    └── common.md
-```
-
-**Supported filters on directories:**
-- `{machine=hostname}` - Machine-specific directories
-- `{os=windows}`, `{os=macos}`, `{os=linux}` - OS-specific directories
-- `{user=username}` - User-specific directories
-- Multiple filters: `mydir.{machine=laptop}{os=windows}/` (AND logic)
-
-**Key behaviors:**
-- Files inside matched directories are copied verbatim (no recursive filter processing)
-- No base directory fallback (unlike files, there's no `mydir.base/` pattern)
-- Nested filtered directories are not allowed: `outer.{machine=X}/inner.{os=Y}/` → Error
-- If multiple directories would produce the same output, an error is raised
-- Stale outputs are renamed with `.permachine-deleted` suffix for safety
-
-### Basic Commands
-
-#### Initialize in Repository
-
-```bash
+cd ~/dotfiles
 permachine init
 ```
 
-**What it does:**
+That's it. From now on, every `config.base.json` is merged with the overrides for this machine into `config.json` whenever git switches, pulls or commits.
 
-- Detects your machine name (e.g., `laptop`, `desktop`, `workstation`)
-- Installs git hooks for automatic merging
-- Scans for existing machine-specific files
-- **Prompts for confirmation** if existing files will be overwritten
-- Performs initial merge
-- Adds output files to `.gitignore` and removes them from git tracking
+<details>
+<summary>What <code>permachine init</code> prints</summary>
 
-**Example output:**
+<br>
 
-```
+```text
 ✓ Machine detected: laptop
 ✓ Git hooks installed via core.hooksPath
 ✓ Merged 2 file(s)
@@ -193,34 +62,256 @@ Git hooks will auto-merge on:
   - commit
 ```
 
-#### Manual Merge
+`init` asks before it overwrites existing output files.
 
-```bash
-permachine merge
+</details>
+
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-filter.svg" width="24" align="absmiddle" alt=""> File names and filters
+
+Put filters in curly braces between the name and the extension. permachine writes the output next to the input, without the filter part.
+
+| File | In git? | Applies on |
+|---|---|---|
+| <code>config.<b>base</b>.json</code> | ✅ | every machine |
+| <code>config.<b>{os=windows}</b>.json</code> | ✅ | Windows |
+| <code>config.<b>{machine=laptop}</b>.json</code> | ✅ | the machine named `laptop` |
+| <code>secrets.<b>{machine=laptop}{user=josxa}</b>.json</code> | ✅ | user `josxa` on `laptop` |
+| `config.json` | ❌ gitignored | **output** |
+
+| Filter | Values | Read from |
+|---|---|---|
+| `{machine=…}` | any hostname, case-insensitive | `COMPUTERNAME` on Windows, `hostname()` elsewhere |
+| `{os=…}` | `windows`, `macos`, `linux` | the platform |
+| `{arch=…}` | `x64`, `arm64` | the CPU |
+| `{user=…}` | any user name | the current user |
+| `{env=…}` | for example `prod`, `dev` | `NODE_ENV` |
+
+Chain filters for AND: `{os=windows}{arch=x64}`. Separate values with commas for OR: `{os=windows,macos}`. The [file filters guide](https://github.com/JosXa/permachine/blob/main/docs/FILE_FILTERS.md) has the complete rules.
+
+<details>
+<summary>Legacy names: <code>config.laptop.json</code></summary>
+
+<br>
+
+The older syntax puts the bare machine name in the file name and still works:
+
+| File | In git? |
+|---|---|
+| `config.base.json` | ✅ |
+| `config.my-laptop.json` | ✅ |
+| `.env.base` | ✅ |
+| `.env.my-laptop` | ✅ |
+| `config.json`, `.env` | ❌ output |
+
+Prefer `{machine=my-laptop}` for new files: it says what it means, and it combines with other filters.
+
+</details>
+
+### Whole directories
+
+A filter on a directory name selects the whole directory. It is copied verbatim, without merging:
+
+<table>
+<tr>
+<th width="50%">In git</th>
+<th width="50%">On <code>homezone</code></th>
+</tr>
+<tr>
+<td valign="top">
+
+```text
+.opencode/skills/
+  jira.{machine=homezone}/
+    SKILL.md
+    templates/issue.md
+  work-tools.{machine=laptop}/
+    slack.md
+  shared-skill/
+    common.md
 ```
 
-**Prompts for confirmation** if existing files will be overwritten. Useful for testing or running without git hooks.
+</td>
+<td valign="top">
 
-#### Watch Mode
-
-```bash
-permachine watch
+```text
+.opencode/skills/
+  jira/            ← copied
+    SKILL.md
+    templates/issue.md
+  shared-skill/
+    common.md
 ```
 
-**What it does:**
+</td>
+</tr>
+</table>
 
-- Watches all base and machine-specific files for changes
-- Automatically merges when you save any watched file
+<details>
+<summary>Directory rules</summary>
 
-#### Check Setup
+<br>
 
-```bash
-permachine info
+- Directories accept the same filters as files, including AND chains.
+- Files inside a matched directory are copied as they are. Their names are not filtered.
+- There is no base directory: `mydir.base/` has no meaning.
+- Nested filtered directories, such as `outer.{machine=x}/inner.{os=y}/`, are an error.
+- Two directories that would produce the same output are an error.
+- A stale output directory is renamed with a `.permachine-deleted` suffix, never deleted.
+
+</details>
+
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-file-cog.svg" width="24" align="absmiddle" alt=""> Supported file types
+
+| Type | Files | Merge |
+|---|---|---|
+| JSON | `.json` | Deep merge. Machine values override base values. |
+| JSONC | `.json`, `.jsonc` with comments and trailing commas | Deep merge. Comments are kept. |
+| ENV | `.env`, `.env.*` | Key upsert. Comments are kept. |
+| Markdown | `.md`, `.markdown` | Base text, then the machine text appended. |
+
+Other files are not merged. YAML ([#1](https://github.com/JosXa/permachine/issues/1)) and TOML ([#2](https://github.com/JosXa/permachine/issues/2)) are planned, and patch files ([#4](https://github.com/JosXa/permachine/issues/4)) are proposed.
+
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-book-open.svg" width="24" align="absmiddle" alt=""> Recipes
+
+### VS Code settings per machine
+
+```jsonc
+// .vscode/settings.base.json
+{ "editor.fontSize": 14, "workbench.colorTheme": "Dark+" }
+
+// .vscode/settings.{machine=worklaptop}.json
+{
+  "http.proxy": "http://proxy.company.com:8080",
+  "terminal.integrated.cwd": "C:/Projects/Work"
+}
 ```
 
-**Example output:**
+On `worklaptop`, `.vscode/settings.json` gets all four settings. Add `settings.{machine=desktop}.json` for the next machine.
 
+### MCP servers that exist on one machine only
+
+[OpenCode](https://opencode.ai) reads one `opencode.json`. Keep the shared parts in the base file and switch servers on or off per machine:
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+```jsonc
+// opencode.base.json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "theme": "nightowl-transparent",
+  "mcp": {
+    "telegram": {
+      "type": "local",
+      "command": ["uvx", "telegram-mcp"],
+      "enabled": false
+    }
+  }
+}
 ```
+
+</td>
+<td width="50%" valign="top">
+
+```jsonc
+// opencode.{machine=homezone}.json
+{
+  "mcp": {
+    "telegram": { "enabled": true }
+  }
+}
+```
+
+Deep merge keeps `type` and `command` from the base file and changes only `enabled`.
+
+</td>
+</tr>
+</table>
+
+### Scripts per operating system
+
+```jsonc
+// package.base.json
+{ "name": "my-app", "scripts": { "test": "vitest" } }
+
+// package.{os=macos,linux}.json
+{ "scripts": { "open": "open http://localhost:3000" } }
+
+// package.{os=windows}.json
+{ "scripts": { "open": "start http://localhost:3000" } }
+```
+
+### Secrets per machine and user
+
+```text
+.env.base                               # shared defaults: ports, feature flags
+.env.{machine=work}{user=alice}         # Alice's keys on the work machine
+.env.{machine=home}{user=alice}         # Alice's keys at home
+.env                                    ← output, gitignored
+```
+
+Variables from the override replace the same keys from the base file. Everything else, including comments, stays.
+
+### Agent instructions per machine
+
+Markdown files are appended, so a machine can add instructions on top of the shared ones:
+
+```text
+AGENTS.base.md                    # shared rules for every machine
+AGENTS.{machine=homezone}.md      # "Projects live in /projects. Use the GPU for local models."
+AGENTS.md                         ← base text, then the homezone text
+```
+
+### Skills that exist on one machine
+
+Use [directory filters](#whole-directories): `skills/jira.{machine=work}/` appears as `skills/jira/` on the work machine only.
+
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-cpu.svg" width="24" align="absmiddle" alt=""> How it works
+
+```mermaid
+---
+config:
+  look: classic
+  themeVariables:
+    edgeLabelBackground: transparent
+---
+flowchart LR
+    classDef step fill:#994CC31a,stroke:#994CC3,stroke-width:1.5px
+    hook(["git hook"]):::step --> detect["Detect<br>machine"]:::step --> merge["Merge base<br>+ overrides"]:::step --> out["Write output<br>+ gitignore"]:::step
+```
+
+A checkout, pull or commit runs the hook.
+
+Hooks live in `.permachine/hooks` and are activated through `core.hooksPath`. `permachine init --legacy` wraps existing hooks in `.git/hooks` instead, for repositories that already use Husky or another hook manager.
+
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-terminal.svg" width="24" align="absmiddle" alt=""> Commands
+
+| Command | Does |
+|---|---|
+| `permachine init` | Installs the hooks, merges once and updates `.gitignore`. |
+| `permachine merge` | Merges now. Asks before it overwrites existing output. |
+| `permachine watch` | Merges whenever you save a watched base or override file. |
+| `permachine info` | Shows the machine name, hook setup and tracked patterns. |
+| `permachine uninstall` | Removes the hooks. |
+
+<details>
+<summary>All options</summary>
+
+<br>
+
+| Option | For | Effect |
+|---|---|---|
+| `--silent`, `-s` | `merge` | Print errors only. |
+| `--legacy` | `init` | Wrap `.git/hooks` instead of setting `core.hooksPath`. |
+| `--auto` | `init` | Choose the hook method automatically. |
+| `--no-gitignore` | `init`, `merge` | Leave `.gitignore` and git tracking alone. |
+| `--debounce <ms>` | `watch` | Wait this long after a change. Default `300`. |
+| `--verbose` | `watch` | Print every file change event. |
+| `--help`, `-h` / `--version`, `-v` | all | Help / version. |
+
+```text
+$ permachine info
 Machine name: laptop
 Repository: /path/to/repo
 Hooks method: core.hooksPath
@@ -234,410 +325,88 @@ Existing output files:
   - config.json
 ```
 
-## Cookbook / Recipes
+</details>
 
-### Recipe 1: VSCode Settings Per Machine
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-life-buoy.svg" width="24" align="absmiddle" alt=""> Troubleshooting
 
-Different settings for work laptop vs home desktop:
+<details>
+<summary><b>Nothing merges after a pull</b></summary>
 
-```bash
-# On work laptop (machine: "worklaptop")
-.vscode/
-  ├── settings.base.json         # Shared: theme, font size
-  ├── settings.worklaptop.json   # Work paths, proxy settings
-  └── settings.json              # ← Merged output (gitignored)
+<br>
 
-# On home desktop (machine: "desktop")
-.vscode/
-  ├── settings.base.json         # Shared: theme, font size
-  ├── settings.desktop.json      # Home paths, no proxy
-  └── settings.json              # ← Merged output (gitignored)
-```
+Check that the hooks are active:
 
-**settings.base.json:**
-
-```json
-{
-  "editor.fontSize": 14,
-  "workbench.colorTheme": "Dark+",
-  "terminal.integrated.shell.windows": "powershell.exe"
-}
-```
-
-**settings.worklaptop.json:**
-
-```json
-{
-  "http.proxy": "http://proxy.company.com:8080",
-  "terminal.integrated.cwd": "C:/Projects/Work"
-}
-```
-
-**settings.desktop.json:**
-
-```json
-{
-  "terminal.integrated.cwd": "C:/Code/Personal",
-  "git.path": "C:/Program Files/Git/bin/git.exe"
-}
-```
-
-### Recipe 2: OpenCode Config (AI Assistant)
-
-[OpenCode](https://opencode.ai) supports machine-specific MCP servers and model preferences:
-
-```bash
-~/.config/opencode/
-  ├── config.base.json         # Shared: agents, themes, keybinds
-  ├── config.worklaptop.json   # Work: Google Sheets MCP
-  ├── config.homezone.json     # Home: Telegram MCP, local paths
-  └── config.json              # ← Merged output (gitignored)
-```
-
-**config.base.json:**
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "theme": "nightowl-transparent",
-  "keybinds": {
-    "input_newline": "shift+return"
-  },
-  "mcp": {
-    "perplexity-mcp": {
-      "enabled": true,
-      "type": "local",
-      "command": ["uvx", "perplexity-mcp"]
-    }
-  }
-}
-```
-
-**config.homezone.json:**
-
-```json
-{
-  "mcp": {
-    "telegram-mcp": {
-      "enabled": true,
-      "type": "local",
-      "command": ["uv", "--directory", "D:\\git\\telegram-mcp", "run", "main.py"]
-    },
-    "google-sheets": {
-      "enabled": true,
-      "environment": {
-        "SERVICE_ACCOUNT_PATH": "C:/Users/josch/.config/opencode/secrets/service-account.json"
-      }
-    }
-  }
-}
-```
-
-**config.worklaptop.json:**
-
-```json
-{
-  "mcp": {
-    "telegram-mcp": {
-      "enabled": false
-    },
-    "google-sheets": {
-      "enabled": true,
-      "environment": {
-        "SERVICE_ACCOUNT_PATH": "/work/credentials/google-service-account.json",
-        "DRIVE_FOLDER_ID": "work-folder-id-123"
-      }
-    }
-  }
-}
-```
-
-### Recipe 3: Package.json Scripts (Platform-Specific)
-
-Different scripts for macOS vs Windows development:
-
-```bash
-# package.base.json
-{
-  "name": "my-app",
-  "version": "1.0.0",
-  "scripts": {
-    "test": "jest",
-    "lint": "eslint src/"
-  },
-  "dependencies": {
-    "express": "^4.18.0"
-  }
-}
-
-# package.macos.json
-{
-  "scripts": {
-    "dev": "NODE_ENV=development nodemon src/index.js",
-    "build": "rm -rf dist && webpack",
-    "open": "open http://localhost:3000"
-  }
-}
-
-# package.windows.json
-{
-  "scripts": {
-    "dev": "set NODE_ENV=development && nodemon src/index.js",
-    "build": "rmdir /s /q dist && webpack",
-    "open": "start http://localhost:3000"
-  }
-}
-
-# package.json ← Merged output
-# Each OS gets appropriate shell commands!
-```
-
-### Recipe 4: Git Config
-
-Personal vs work Git settings:
-
-```bash
-# .gitconfig.base
-[core]
-  editor = code --wait
-  autocrlf = true
-[pull]
-  rebase = true
-[init]
-  defaultBranch = main
-
-# .gitconfig.worklaptop
-[user]
-  name = John Doe
-  email = john.doe@company.com
-[url "https://"]
-  insteadOf = git://
-[http]
-  proxy = http://proxy.company.com:8080
-
-# .gitconfig.homezone
-[user]
-  name = JohnD
-  email = johndoe@personal.com
-[github]
-  user = johnd-personal
-```
-
-### Recipe 5: Multi-File Dotfiles
-
-Complete dotfiles setup across machines:
-
-```bash
-~/.config/
-├── nvim/
-│   ├── init.base.vim        # Shared vim config
-│   ├── init.worklaptop.vim  # Work-specific plugins
-│   ├── init.homezone.vim    # Personal plugins
-│   └── init.vim             # ← Merged
-├── alacritty/
-│   ├── alacritty.base.yml   # Shared terminal config
-│   ├── alacritty.macos.yml  # macOS font paths
-│   ├── alacritty.windows.yml # Windows font paths
-│   └── alacritty.yml        # ← Merged
-├── opencode/
-│   ├── config.base.json
-│   ├── config.worklaptop.json
-│   └── config.json          # ← Merged
-└── .env.base
-    .env.worklaptop
-    .env                     # ← Merged
-
-# After `permachine init`, sync your dotfiles repo across machines!
-# Each machine automatically gets the right config.
-```
-
-### Recipe 6: Advanced Filters - Cross-Platform Development
-
-**NEW**: Use the advanced filter syntax for precise control:
-
-```bash
-# Project structure
-project/
-├── config.base.json                    # Shared config
-├── config.{os=windows}.json            # Windows-specific paths
-├── config.{os=macos}.json              # macOS-specific paths
-├── config.{os=linux}.json              # Linux-specific paths
-├── secrets.{machine=work}{user=alice}.json   # Alice's work secrets
-├── secrets.{machine=home}{user=alice}.json   # Alice's home secrets
-├── build.{os=windows}{arch=x64}.json   # Windows x64 build config
-├── build.{os=windows}{arch=arm64}.json # Windows ARM build config
-└── config.json                         # ← Merged (gitignored)
-```
-
-**Example use cases:**
-
-```bash
-# Multiple platforms with OR logic
-package.{os=windows,macos}.json   # Matches Windows OR macOS
-
-# Specific environment AND machine
-secrets.{env=prod}{machine=server-us-east}.json
-
-# User-specific on specific machine
-.vscode/settings.{machine=laptop}{user=josxa}.json
-
-# Multiple users on shared machine
-preferences.{user=alice}.json
-preferences.{user=bob}.json
-```
-
-**See [File Filters Documentation](docs/FILE_FILTERS.md) for complete guide and examples.**
-
-## How It Works
-
-`permachine` uses a simple process:
-
-1. **Machine Detection** - Automatically detects your machine name from hostname (Windows: `COMPUTERNAME`, Linux/Mac: `hostname()`) and other system properties (OS, architecture, username, environment)
-
-2. **File Discovery** - Scans your repository for files matching patterns:
-   - **New**: `{key=value}` syntax (e.g., `config.{os=windows}.json`, `secrets.{machine=laptop}{user=josxa}.json`)
-   - **Legacy**: `*.{machine}.*` syntax (e.g., `config.laptop.json`, `.env.desktop`)
-
-3. **Filter Matching** - For new syntax, evaluates filters against current system context:
-   - AND logic: ALL filters must match (e.g., `{os=windows}{arch=x64}`)
-   - OR logic: ANY value in list matches (e.g., `{os=windows,macos}`)
-
-4. **Smart Merging** - Merges base and machine-specific configs:
-   - **JSON**: Deep recursive merge (machine values override base)
-   - **ENV**: Key-value merge with comment preservation
-
-5. **Gitignore Management** - Automatically adds output files to `.gitignore` and removes already-tracked files from git
-
-6. **Git Hooks** - Installs hooks to auto-merge on checkout, merge, and commit operations
-
-For detailed implementation information, see [CONTRIBUTING.md](CONTRIBUTING.md) and [File Filters Documentation](docs/FILE_FILTERS.md).
-
-## Supported File Types
-
-| Type     | Extensions            | Merge Strategy                    | Status                                         |
-| -------- | --------------------- | --------------------------------- | ---------------------------------------------- |
-| JSON     | `.json`               | Deep recursive merge              | ✅ Supported                                   |
-| JSONC    | `.json` with comments | Deep merge + comment preservation | ✅ Supported                                   |
-| ENV      | `.env`, `.env.*`      | Key-value upsert                  | ✅ Supported                                   |
-| Markdown | `.md`, `.markdown`    | Append (base + machine)           | ✅ Supported                                   |
-| YAML     | `.yaml`, `.yml`       | Deep recursive merge              | 🔜 [Planned](#1)                               |
-| TOML     | `.toml`               | Deep recursive merge              | 🔜 [Planned](#2)                               |
-| Patch    | `.patch`              | Apply git-style patch to base     | 💡 [Proposed](#4) |
-
-## Troubleshooting
-
-### Hooks not running
-
-**Check hook installation:**
-
-```bash
-permachine info
-```
-
-**Verify git config:**
-
-```bash
-git config --get core.hooksPath
-# Should output: .permachine/hooks
-```
-
-**Check hook files exist:**
-
-```bash
+```sh
+git config --get core.hooksPath   # expect .permachine/hooks
 ls .permachine/hooks/
 ```
 
-### Merge not happening
+Then run `permachine merge` by hand to see errors.
 
-**Run manually to see errors:**
+</details>
 
-```bash
-permachine merge
+<details>
+<summary><b>My override file is ignored</b></summary>
+
+<br>
+
+Compare the name in your file with the detected machine name:
+
+```sh
+permachine info   # "Machine name: …"
+hostname          # echo %COMPUTERNAME% on Windows
 ```
 
-**Check machine name matches your files:**
+Names are case-insensitive. Also check the [supported file types](#-supported-file-types): permachine skips files it cannot merge.
 
-```bash
-permachine info
-# Verify "Machine name" matches your file pattern
-```
+</details>
 
-### Wrong machine name detected
+<details>
+<summary><b>I already use Husky or another hook manager</b></summary>
 
-Machine names are auto-detected from your system hostname. To verify:
+<br>
 
-```bash
-# Windows
-echo %COMPUTERNAME%
-
-# Linux/Mac
-hostname
-```
-
-Files must match this name (case-insensitive).
-
-### Conflicts with other git hook tools
-
-If you use Husky or other hook managers, use legacy mode:
-
-```bash
+```sh
 permachine uninstall
 permachine init --legacy
 ```
 
-This wraps existing hooks instead of replacing them.
+Legacy mode wraps the existing hooks instead of replacing them.
 
-### Output file not being gitignored
+</details>
 
-By default, `permachine init` and `permachine merge` automatically add output files to `.gitignore`. If this isn't working:
+<details>
+<summary><b>The output file still shows up in git</b></summary>
 
-1. Check if `.gitignore` exists and contains your output files
-2. Verify the file was removed from git tracking: `git ls-files config.json` (should return nothing)
-3. If you used `--no-gitignore`, re-run without that flag
+<br>
 
-To manually fix:
+`init` and `merge` add outputs to `.gitignore` unless you passed `--no-gitignore`. To fix one file by hand:
 
-```bash
+```sh
 echo "config.json" >> .gitignore
 git rm --cached config.json
 ```
 
-## Contributing
+`git ls-files config.json` prints nothing once the file is untracked.
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+</details>
 
-- Development setup
-- Architecture overview
-- Testing guidelines
-- Code standards
-- How to submit PRs
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-map.svg" width="24" align="absmiddle" alt=""> Roadmap
 
-## License
-
-MIT © [JosXa](https://github.com/JosXa)
-
-## Roadmap
-
-- [x] JSON support
-- [x] ENV support
-- [x] JSONC support (comments & trailing commas)
-- [x] Git hooks (hooksPath & legacy)
-- [x] Automatic .gitignore management
-- [x] CLI interface
-- [x] Comprehensive tests (81 tests)
-- [x] npm package publication
-- [x] Watch mode for development
+- [x] JSON, JSONC, ENV and Markdown merging
+- [x] Git hooks through `core.hooksPath` or legacy wrapping, plus `.gitignore` management
+- [x] Watch mode and directory filters
 - [ ] YAML support ([#1](https://github.com/JosXa/permachine/issues/1))
 - [ ] TOML support ([#2](https://github.com/JosXa/permachine/issues/2))
-- [x] Markdown support ([#3](https://github.com/JosXa/permachine/issues/3))
-- [ ] Patch file support ([#4](https://github.com/JosXa/permachine/issues/4))
+- [ ] Patch files ([#4](https://github.com/JosXa/permachine/issues/4))
 - [ ] Custom merge strategies ([#5](https://github.com/JosXa/permachine/issues/5))
 - [ ] Config file for patterns ([#6](https://github.com/JosXa/permachine/issues/6))
 - [ ] Dry-run mode ([#7](https://github.com/JosXa/permachine/issues/7))
 
-## Credits
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-users.svg" width="24" align="absmiddle" alt=""> Contributing
 
-Inspired by:
+[CONTRIBUTING.md](https://github.com/JosXa/permachine/blob/main/CONTRIBUTING.md) covers the development setup, architecture, tests and code standards. Hook handling is inspired by [Husky](https://github.com/typicode/husky).
 
-- [Husky](https://github.com/typicode/husky) - Git hooks made easy
-- The need for machine-specific configurations across development environments
+## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-scale.svg" width="24" align="absmiddle" alt=""> License
+
+[MIT](https://github.com/JosXa/permachine/blob/main/LICENSE) © [JosXa](https://github.com/JosXa)
