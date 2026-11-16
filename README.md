@@ -199,7 +199,6 @@ On `worklaptop`, `.vscode/settings.json` gets all four settings. Add `settings.{
 ```jsonc
 // opencode.base.json
 {
-  "$schema": "https://opencode.ai/config.json",
   "theme": "nightowl-transparent",
   "mcp": {
     "telegram": {
@@ -259,7 +258,7 @@ Markdown files are appended, so a machine can add instructions on top of the sha
 
 ```text
 AGENTS.base.md                    # shared rules for every machine
-AGENTS.{machine=homezone}.md      # "Projects live in /projects. Use the GPU for local models."
+AGENTS.{machine=homezone}.md      # "Use the GPU for local models."
 AGENTS.md                         ← base text, then the homezone text
 ```
 
