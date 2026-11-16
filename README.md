@@ -13,7 +13,7 @@ permachine merges shared base files with per-machine overrides, for tools that h
 <img src="https://img.shields.io/badge/runs%20on-git%20hooks-994CC3?style=flat-square&labelColor=011627&logo=git&logoColor=white" alt="Runs on git hooks">
 <a href="https://github.com/JosXa/permachine/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-011627?style=flat-square" alt="MIT license"></a>
 
-[**Quick start**](#-quick-start) · [File names](#-file-names-and-filters) · [Recipes](#-recipes) · [Commands](#-commands) · [Troubleshooting](#-troubleshooting)
+[**Quick start**](#-quick-start)&nbsp;&nbsp;&nbsp;[File names](#-file-names-and-filters)&nbsp;&nbsp;&nbsp;[Recipes](#-recipes)&nbsp;&nbsp;&nbsp;[Commands](#-commands)&nbsp;&nbsp;&nbsp;[Troubleshooting](#-troubleshooting)
 
 <br>
 
@@ -25,14 +25,14 @@ permachine merges shared base files with per-machine overrides, for tools that h
 
 ## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-lightbulb.svg" width="24" align="absmiddle" alt=""> Why
 
-You sync your dotfiles across a work laptop, a home desktop and a server. Most settings are shared, but some are not: local paths, proxies, API keys, MCP servers that exist on one machine only. Most tools read exactly one config file and have no idea which machine they run on.
+You sync your dotfiles across a work laptop, a home desktop and a server. Most settings are shared, and a few belong to one machine: local paths, proxies, API keys, MCP servers that exist on one machine only. Most tools read exactly one config file and cannot select settings by machine.
 
 permachine keeps one `base` file plus small override files in git and writes the merged result on each machine:
 
 - **Detects the machine** by hostname, OS, CPU architecture, user and `NODE_ENV`.
 - **Merges** the base file with every override that matches. Machine values win.
 - **Gitignores the output** and removes it from git tracking, so merged files never get committed.
-- **Runs on its own** through git hooks on checkout, merge (`git pull`) and commit.
+- **Runs automatically** through git hooks on checkout, merge (`git pull`) and commit.
 
 ## <img src="https://raw.githubusercontent.com/JosXa/permachine/main/.github/readme/icon-rocket.svg" width="24" align="absmiddle" alt=""> Quick start
 
@@ -42,7 +42,7 @@ cd ~/dotfiles
 permachine init
 ```
 
-That's it. From now on, every `config.base.json` is merged with the overrides for this machine into `config.json` whenever git switches, pulls or commits.
+From now on, every `config.base.json` is merged with the overrides for this machine into `config.json` whenever git switches, pulls or commits.
 
 <details>
 <summary>What <code>permachine init</code> prints</summary>
@@ -152,7 +152,7 @@ A filter on a directory name selects the whole directory. It is copied verbatim,
 <br>
 
 - Directories accept the same filters as files, including AND chains.
-- Files inside a matched directory are copied as they are. Their names are not filtered.
+- permachine copies the files inside a matched directory with their names unchanged.
 - There is no base directory: `mydir.base/` has no meaning.
 - Nested filtered directories, such as `outer.{machine=x}/inner.{os=y}/`, are an error.
 - Two directories that would produce the same output are an error.
